@@ -8,6 +8,7 @@ from simple_pid import PID
 from max6675 import MAX6675
 
 def set_time(rtc):
+    #This function is currently useless
     #TODO: Update to be updated via ui
     if rtc.datetime.tm_year == 0: #users sets the time if there isn't one
         print('Enter the current date and time in the following format then press enter:\n YYYY,MM,DD,HH,MM,SS,WDAY,DOY')
@@ -34,13 +35,10 @@ def update_oled(oled, data, time, controlling, relay_state):
     oled.text(f'Press select for menu', 0, 50, 1)
     oled.show()
 
-def debug_log():
-    pass
-
 def data_log():
     pass
 
-def reset_oled(oled):
+def reset_oled(oled): #clears the oled display
     oled.fill(0)
     oled.show()
     return
@@ -87,8 +85,6 @@ def init_pid(temp):
     pid.output_limits = (0, 10)
     return pid
 
-
-
 def main():
     control_temp = 50 #temp to control the oven to in C
     start_time = 11 #The time in hours at which the oven should reach the control temp and start controlling if not
@@ -118,9 +114,10 @@ def main():
         update_oled(oled, data, datetime, controlling, relay.value) #update the oled display
         time.sleep(0.01)
     
-
 if __name__ == '__main__':
     main()
-#TODO: Add pid output = some sort of time on for the relay
-#TODO: Update get_date_time to use use epoch time instead of a formatted string. Only format when needed
+#TODO: Establish multiplier for pid output to time in minutes
 #TODO: Store any user editable params in settings.json
+#TODO: Implement a menu system
+#TODO: Implement a logging system
+#TODO: Implement rotary encoder for menu navigation
