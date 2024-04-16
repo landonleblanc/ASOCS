@@ -19,27 +19,18 @@ def set_time(rtc):
         rtc.datetime = t #set the time
     return
 
-def need_pid(oven_temp, time):
-    time = time.split(':')
-    if oven_temp < control_temp and int(time[0]) > start_time and int(time[0]) < end_time:
-        need_pid = True
-        print('Conditions not met, turning oven PID on')
-    else:
-        need_pid = False
-    return need_pid
-
 def update_oled(oled, data):
-    oled.fill(0)
-    oled.text(f'Date: {data["date"]}', 0, 0, 2)  # Double the font size to 2
-    oled.text(f'Time: {data["time"]}', 0, 20, 2)  # Double the font size to 2
-    oled.text(f'Air Temp: {data["air"]}C', 0, 40, 2)  # Double the font size to 2
-    oled.text(f'Oven Temp: {data["oven"]}C', 0, 60, 2)  # Double the font size to 2
-    if control_enabled:
-        oled.text(f'Oven Ctrl: Enabled', 0, 80, 2)  # Double the font size to 2
-    else:
-        oled.text(f'Oven Ctrl: Disabled', 0, 80, 2)  # Double the font size to 2
-    oled.text(f'Press select for menu', 0, 100, 2)  # Double the font size to 2
-    oled.show()
+    # oled.fill(0)
+    # oled.text(f'Date: {data["date"]}', 0, 0, 2)  # Double the font size to 2
+    # oled.text(f'Time: {data["time"]}', 0, 20, 2)  # Double the font size to 2
+    # oled.text(f'Air Temp: {data["air"]}C', 0, 40, 2)  # Double the font size to 2
+    # oled.text(f'Oven Temp: {data["oven"]}C', 0, 60, 2)  # Double the font size to 2
+    # if control_enabled:
+    #     oled.text(f'Oven Ctrl: Enabled', 0, 80, 2)  # Double the font size to 2
+    # else:
+    #     oled.text(f'Oven Ctrl: Disabled', 0, 80, 2)  # Double the font size to 2
+    # oled.text(f'Press select for menu', 0, 100, 2)  # Double the font size to 2
+    # oled.show()
     
     oled.text(f'Date: {data["date"]}', 0, 0, 1)
     oled.text(f'Time: {data["time"]}', 0, 10, 1)
@@ -66,7 +57,7 @@ def reset_oled(oled):
 def init_hw():
     #Hardware Startup Sequence
     rtc_i2c = busio.I2C(board.GP19, board.GP18)#create an i2c object on pins 18 and 19
-    oled_i2c = busio.I2C(board.GP13, board.GP12)#create an i2c object on pins 18 and 19
+    oled_i2c = busio.I2C(board.GP13, board.GP12)#create an i2c object on pins 12 and 13
     print('Initializing OLED...')
     oled = adafruit_ssd1306.SSD1306_I2C(128, 64, oled_i2c)#initialize the lcd
     oled.fill(1)
@@ -85,7 +76,7 @@ def init_hw():
     tc = MAX6675(board.GP2, board.GP3, board.GP4)
     print('Thermocouple initialized')
     print('Initializing relay...')
-    relay = digitalio.DigitalInOut(board.GP28)
+    relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
     relay.direction = digitalio.Direction.OUTPUT
     print('Relay initialized')
     time.sleep(1)
@@ -108,35 +99,32 @@ def init_pid(temp):
 
 
 def main():
-    control_temp = 50
-    start_time = 11
-    end_time = 17
-    control = False
-    element_on_until = 0
-    time = 0
-    data = {'air': 15, 'oven': 15, 'pid_needed': False , 'element': False, 'pid': 0}
-    rtc, oled, tc, relay = init_hw()
-    pid = init_pid(control_temp)
+    control_temp = 50 #temp to control the oven to in C
+    start_time = 11 #The time in hours at which the oven should reach the control temp and start controlling if not
+    end_time = 17 #The latest time in hours at which the oven should be controlled if conditions are not met
+    data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
+    rtc, oled, tc, relay = init_hw() #initialize the hardware components
+    pid_time = 0 #How long the element should be turned on for in minutes
+    controlling = False #whether or not the oven needs to be controlled
+    element = False #Whether or not the element is currently on
+    pid = init_pid(control_temp) #Cretes the pid class
     while True:
-        time = rtc.datetime
-        data['air'] = rtc.temperature #obtain the air temp from the rtc
+        datetime = rtc.datetime
+        time = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
+        data['air'] = rtc.temperature #obtain the "air" temp from the rtc
         data['oven'] = tc.read() #obtain the oven temp from the thermocouple
-        if data['pid'] == False:
-            data['pid'] = need_pid(data['oven'], data['time']) #determine if the oven needs to be controlled
-        elif data['pid'] == True:
+        if controlling == False: #if we aren't currently controlling, check if the desired conditions are not met
+            relay.value = False
+            if data['oven'] < control_temp and time > start_time and time < end_time:
+                controlling = True
+                print('Conditions not met, turning oven PID control on')
+        elif controlling == True:
             pid_output = pid(data['oven']) #if control is needed, run the PID
-            print(f'PID output: {pid_output}')
-            if pid_output > 0.5:
-                data['relay'] = True
-            else:
-                data['relay'] = False
+            pid_time = time + pid_output * 60 #set the ending time for the element
+        if time < pid_time and controlling:
+            relay.value = True #turn the element on if the pid duration hasn't finished
         else:
-            data['relay'] = False
-        relay.value = data['relay'] #set the relay to the PID output
-        hour = data['time'].split(':')[0]
-        if int(hour) > 17:
-            data['pid'] = False
-        print(f'Date: {data["date"]}, Time: {data["time"]}, Air Temp: {data["air"]}C, Oven Temp: {data["oven"]}C, PID Needed?: {data["pid"]}, Relay Status: {data["relay"]}')
+            relay.value = False #turn the element off
         update_oled(oled, data)
         time.sleep(0.01)
     
