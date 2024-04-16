@@ -19,27 +19,18 @@ def set_time(rtc):
         rtc.datetime = t #set the time
     return
 
-def update_oled(oled, data):
-    # oled.fill(0)
-    # oled.text(f'Date: {data["date"]}', 0, 0, 2)  # Double the font size to 2
-    # oled.text(f'Time: {data["time"]}', 0, 20, 2)  # Double the font size to 2
-    # oled.text(f'Air Temp: {data["air"]}C', 0, 40, 2)  # Double the font size to 2
-    # oled.text(f'Oven Temp: {data["oven"]}C', 0, 60, 2)  # Double the font size to 2
-    # if control_enabled:
-    #     oled.text(f'Oven Ctrl: Enabled', 0, 80, 2)  # Double the font size to 2
-    # else:
-    #     oled.text(f'Oven Ctrl: Disabled', 0, 80, 2)  # Double the font size to 2
-    # oled.text(f'Press select for menu', 0, 100, 2)  # Double the font size to 2
-    # oled.show()
-    
-    oled.text(f'Date: {data["date"]}', 0, 0, 1)
-    oled.text(f'Time: {data["time"]}', 0, 10, 1)
+def update_oled(oled, data, time, controlling, relay_state):
+    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 10, 1)
     oled.text(f'Air Temp: {data["air"]}C', 0, 20, 1)
     oled.text(f'Oven Temp: {data["oven"]}C', 0, 30, 1)
-    if control_enabled:
+    if controlling:
         oled.text(f'Oven Ctrl: Enabled', 0, 40, 1)
     else:
         oled.text(f'Oven Ctrl: Disabled', 0, 40, 1)
+    if relay_state:
+        oled.text(f'Element: On', 0, 50, 1)
+    else:
+        oled.text(f'Element: Off', 0, 50, 1)
     oled.text(f'Press select for menu', 0, 50, 1)
     oled.show()
 
@@ -106,7 +97,6 @@ def main():
     rtc, oled, tc, relay = init_hw() #initialize the hardware components
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
-    element = False #Whether or not the element is currently on
     pid = init_pid(control_temp) #Cretes the pid class
     while True:
         datetime = rtc.datetime
@@ -125,7 +115,7 @@ def main():
             relay.value = True #turn the element on if the pid duration hasn't finished
         else:
             relay.value = False #turn the element off
-        update_oled(oled, data)
+        update_oled(oled, data, datetime, controlling, relay.value) #update the oled display
         time.sleep(0.01)
     
 
