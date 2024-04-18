@@ -1,3 +1,5 @@
+import json
+import random
 import board
 import busio
 import time
@@ -6,6 +8,7 @@ import adafruit_ds3231
 import adafruit_ssd1306
 from simple_pid import PID
 from max6675 import MAX6675
+
 
 def set_time(rtc):
     #This function is currently useless
@@ -43,41 +46,76 @@ def reset_oled(oled): #clears the oled display
     oled.show()
     return
 
+def fill_oled_random(oled):
+    for x in range(oled.width):
+        for y in range(oled.height):
+            oled.pixel(x, y, random.randint(0, 1))
+            oled.show()
+    oled.show()
+
+def display_text(oled, text):
+    text = text.split('\n')
+    for i in range(len(text)):
+        oled.text(text[i], 0, i*10, 1)
+    oled.show()
+    time.sleep(1)
+    reset_oled(oled)
+    return
+
 def init_hw():
     #Hardware Startup Sequence
     rtc_i2c = busio.I2C(board.GP19, board.GP18)#create an i2c object on pins 18 and 19
     oled_i2c = busio.I2C(board.GP13, board.GP12)#create an i2c object on pins 12 and 13
     print('Initializing OLED...')
     oled = adafruit_ssd1306.SSD1306_I2C(128, 64, oled_i2c)#initialize the lcd
-    oled.fill(1)
-    oled.show()
-    time.sleep(0.5)
+    fill_oled_random(oled)
     reset_oled(oled)
     print('OLED initialized')
-    oled.text('Initializing', 0, 0, 1)
-    oled.text('System...', 0, 10, 1)
-    oled.show()
+    display_text(oled, 'Initializing\nSystem...')
     print('Initializing RTC...')
+    display_text(oled, 'Initializing\nRTC...')
     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
     set_time()#set the time if it has defaulted
     print('RTC initialized')
+    display_text(oled, 'RTC\nInitialized')
     print('Initializing thermocouple...')
+    display_text(oled, 'Initializing\nThermocouple...')
     tc = MAX6675(board.GP2, board.GP3, board.GP4)
     print('Thermocouple initialized')
+    display_text(oled, 'Thermocouple\nInitialized')
     print('Initializing relay...')
+    display_text(oled, 'Initializing\nRelay...')
     relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
     relay.direction = digitalio.Direction.OUTPUT
     print('Relay initialized')
-    time.sleep(1)
-    oled.text('System', 0, 0, 1)
-    oled.text('Initialized', 0, 10, 1)
-    oled.show()
+    display_text(oled, 'Relay\nInitialized')
+    print('System Initialized')
+    display_text(oled, 'System\nInitialized')
     reset_oled(oled)
     #End Hardware Startup Sequence
     return rtc, oled, tc, relay
 
-def system_settings():
-    pass
+def load_settings():
+    try:
+        with open('settings.json', 'r') as f:
+            settings = json.load(f)
+        return settings, True
+    except:
+        settings = {'control_temp': 50, 'start_time': 660, 'end_time': 1020}
+        with open('settings.json', 'w') as f:
+            json.dump(settings, f)
+        return settings, False
+
+def save_settings(settings):
+    with open('settings.json', 'w') as f:
+        json.dump(settings, f)
+    try:
+        with open('settings.json', 'r') as f:
+            assert json.load(f) == settings 
+        return True
+    except:
+        print('Error saving settings')
+    return False
 
 def init_pid(temp):
     pid = PID(1, 0.1, 0.05, setpoint=temp)
@@ -86,14 +124,18 @@ def init_pid(temp):
     return pid
 
 def main():
-    control_temp = 50 #temp to control the oven to in C
-    start_time = 11 #The time in hours at which the oven should reach the control temp and start controlling if not
-    end_time = 17 #The latest time in hours at which the oven should be controlled if conditions are not met
     data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
     rtc, oled, tc, relay = init_hw() #initialize the hardware components
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
-    pid = init_pid(control_temp) #Cretes the pid class
+    settings, success = load_settings() #load the settings from the settings.json file or use defaults if unsuccessful
+    if success:
+        print('Settings loaded successfully')
+        display_text(oled, 'Settings\nLoaded')
+    else:
+        print('Settings not found, using defaults')
+        display_text(oled, 'Settings\nNot Found\nUsing Defaults')
+    pid = init_pid(settings['control_temp']) #Cretes the pid class
     while True:
         datetime = rtc.datetime
         time = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
@@ -101,10 +143,13 @@ def main():
         data['oven'] = tc.read() #obtain the oven temp from the thermocouple
         if controlling == False: #if we aren't currently controlling, check if the desired conditions are not met
             relay.value = False
-            if data['oven'] < control_temp and time > start_time and time < end_time:
+            if data['oven'] < settings['control_temp'] and time > settings['start_time'] and time < settings['end_time']:
                 controlling = True
                 print('Conditions not met, turning oven PID control on')
         elif controlling == True:
+            if time > settings['end_time']:
+                controlling = False
+                print('End time exceeded, turning oven PID control off')
             pid_output = pid(data['oven']) #if control is needed, run the PID
             pid_time = time + pid_output * 60 #set the ending time for the element
         if time < pid_time and controlling:
