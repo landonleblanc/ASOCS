@@ -59,7 +59,7 @@ def init_hw():
     oled.show()
     print('Initializing RTC...')
     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
-    set_time()#set the time if it has defaulted
+    set_time(rtc)#set the time if it has defaulted
     print('RTC initialized')
     print('Initializing thermocouple...')
     tc = MAX6675(board.GP2, board.GP3, board.GP4)
@@ -94,20 +94,21 @@ def main():
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
     pid = init_pid(control_temp) #Cretes the pid class
+    print('System initialized, entering main loop')
     while True:
         datetime = rtc.datetime
-        time = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
+        time_min = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
         data['air'] = rtc.temperature #obtain the "air" temp from the rtc
         data['oven'] = tc.read() #obtain the oven temp from the thermocouple
         if controlling == False: #if we aren't currently controlling, check if the desired conditions are not met
             relay.value = False
-            if data['oven'] < control_temp and time > start_time and time < end_time:
+            if data['oven'] < control_temp and time_min > start_time and time_min < end_time:
                 controlling = True
                 print('Conditions not met, turning oven PID control on')
         elif controlling == True:
             pid_output = pid(data['oven']) #if control is needed, run the PID
-            pid_time = time + pid_output * 60 #set the ending time for the element
-        if time < pid_time and controlling:
+            pid_time = time_min + pid_output * 60 #set the ending time for the element
+        if time_min < pid_time and controlling:
             relay.value = True #turn the element on if the pid duration hasn't finished
         else:
             relay.value = False #turn the element off
