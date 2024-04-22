@@ -50,15 +50,14 @@ def fill_oled_random(oled):
     for x in range(oled.width):
         for y in range(oled.height):
             oled.pixel(x, y, random.randint(0, 1))
-            oled.show()
     oled.show()
 
-def display_text(oled, text):
+def display_text(oled, text, duration=1):
     text = text.split('\n')
     for i in range(len(text)):
         oled.text(text[i], 0, i*10, 1)
     oled.show()
-    time.sleep(1)
+    time.sleep(duration)
     reset_oled(oled)
     return
 
