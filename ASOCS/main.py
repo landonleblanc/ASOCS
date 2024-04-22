@@ -21,17 +21,17 @@ def set_time(rtc):
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
-    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 10, 1)
-    oled.text(f'Air Temp: {data["air"]}C', 0, 20, 1)
-    oled.text(f'Oven Temp: {data["oven"]}C', 0, 30, 1)
+    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 0, 1)
+    oled.text(f'Air Temp: {data["air"]}C', 0, 10, 1)
+    oled.text(f'Oven Temp: {data["oven"]}C', 0, 20, 1)
     if controlling:
-        oled.text(f'Oven Ctrl: Enabled', 0, 40, 1)
+        oled.text(f'Oven Ctrl: Enabled', 0, 30, 1)
     else:
-        oled.text(f'Oven Ctrl: Disabled', 0, 40, 1)
+        oled.text(f'Oven Ctrl: Disabled', 0, 30, 1)
     if relay_state:
-        oled.text(f'Element: On', 0, 50, 1)
+        oled.text(f'Element: On', 0, 40, 1)
     else:
-        oled.text(f'Element: Off', 0, 50, 1)
+        oled.text(f'Element: Off', 0, 40, 1)
     oled.text(f'Press select for menu', 0, 50, 1)
     oled.show()
 
