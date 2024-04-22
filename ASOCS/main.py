@@ -75,7 +75,7 @@ def init_hw():
     print('Initializing RTC...')
     display_text(oled, 'Initializing\nRTC...')
     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
-    set_time()#set the time if it has defaulted
+    #set_time()#set the time if it has defaulted
     print('RTC initialized')
     display_text(oled, 'RTC\nInitialized')
     print('Initializing thermocouple...')
