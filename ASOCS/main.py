@@ -24,17 +24,17 @@ def set_time(rtc):
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
-    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 10, 1)
-    oled.text(f'Air Temp: {data["air"]}C', 0, 20, 1)
-    oled.text(f'Oven Temp: {data["oven"]}C', 0, 30, 1)
+    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 0, 1)
+    oled.text(f'Air Temp: {data["air"]}C', 0, 10, 1)
+    oled.text(f'Oven Temp: {data["oven"]}C', 0, 20, 1)
     if controlling:
-        oled.text(f'Oven Ctrl: Enabled', 0, 40, 1)
+        oled.text(f'Oven Ctrl: Enabled', 0, 30, 1)
     else:
-        oled.text(f'Oven Ctrl: Disabled', 0, 40, 1)
+        oled.text(f'Oven Ctrl: Disabled', 0, 30, 1)
     if relay_state:
-        oled.text(f'Element: On', 0, 50, 1)
+        oled.text(f'Element: On', 0, 40, 1)
     else:
-        oled.text(f'Element: Off', 0, 50, 1)
+        oled.text(f'Element: Off', 0, 40, 1)
     oled.text(f'Press select for menu', 0, 50, 1)
     oled.show()
 
@@ -137,12 +137,12 @@ def main():
     pid = init_pid(settings['control_temp']) #Cretes the pid class
     while True:
         datetime = rtc.datetime
-        time = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
+        time_min = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
         data['air'] = rtc.temperature #obtain the "air" temp from the rtc
         data['oven'] = tc.read() #obtain the oven temp from the thermocouple
         if controlling == False: #if we aren't currently controlling, check if the desired conditions are not met
             relay.value = False
-            if data['oven'] < settings['control_temp'] and time > settings['start_time'] and time < settings['end_time']:
+            if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
                 controlling = True
                 print('Conditions not met, turning oven PID control on')
         elif controlling == True:
@@ -150,8 +150,8 @@ def main():
                 controlling = False
                 print('End time exceeded, turning oven PID control off')
             pid_output = pid(data['oven']) #if control is needed, run the PID
-            pid_time = time + pid_output * 60 #set the ending time for the element
-        if time < pid_time and controlling:
+            pid_time = time_min + pid_output * 60 #set the ending time for the element
+        if time_min < pid_time and controlling:
             relay.value = True #turn the element on if the pid duration hasn't finished
         else:
             relay.value = False #turn the element off
