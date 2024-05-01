@@ -159,21 +159,21 @@ def main():
         time_min = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
         data['air'] = rtc.temperature #obtain the "air" temp from the rtc
         data['oven'] = tc.read() #obtain the oven temp from the thermocouple
-        if controlling == False: #if we aren't currently controlling, check if the desired conditions are not met
+        if not controlling: #if we aren't currently controlling, check if the desired conditions are not met
             relay.value = False
             if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
                 controlling = True
                 print('Conditions not met, turning oven PID control on')
-        elif controlling == True:
+        elif controlling:
             if time_min > settings['end_time']:
                 controlling = False
                 print('End time exceeded, turning oven PID control off')
-            pid_output = pid(data['oven']) #if control is needed, run the PID
-            pid_time = time_min + pid_output * 60 #set the ending time for the element
-        if time_min < pid_time and controlling:
-            relay.value = True #turn the element on if the pid duration hasn't finished
-        else:
-            relay.value = False #turn the element off
+            if data['oven'] < settings['control_temp'] and relay.value == False:
+                pid_time = time_min + pid(data['oven']) #set the ending time for the element
+            if time_min < pid_time:
+                relay.value = True #turn the element on if the pid duration hasn't finished
+            else:
+                relay.value = False #turn the element off
         if data != previous_data or controlling != previous_controlling or relay.value != previous_relay_value:
             update_oled(oled, data, datetime, controlling, relay.value) #update the oled display
         if not button.value:
@@ -182,7 +182,7 @@ def main():
             #display_text(oled, 'Button\nPressed')
         # i += 1
         # print(i)
-        #time.sleep(0.01)
+        time.sleep(0.01)
     
 if __name__ == '__main__':
     main()
