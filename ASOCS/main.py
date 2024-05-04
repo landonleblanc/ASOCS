@@ -25,8 +25,12 @@ def set_time(rtc):
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
+    def add_leading_zeros(num):
+        return "{:02d}".format(num)
     oled.fill(0)
-    oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 0, 1)
+    hour = add_leading_zeros(time.tm_hour)
+    minute = add_leading_zeros(time.tm_min)
+    oled.text(f'Time: {hour}:{minute}', 0, 0, 1)
     oled.text(f'Air Temp: {data["air"]}C', 0, 10, 1)
     oled.text(f'Oven Temp: {data["oven"]}C', 0, 20, 1)
     if controlling:
@@ -81,7 +85,6 @@ def display_menu(oled, menu, encoder, button):
             if selected > len(menu) - 1:
                 selected = 0
         time.sleep(0.1)
-    return
 
 def init_hw():
     #Hardware Startup Sequence
