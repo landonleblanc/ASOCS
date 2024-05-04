@@ -25,6 +25,7 @@ def set_time(rtc):
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
+    oled.fill(0)
     oled.text(f'Time: {time.tm_hour}:{time.tm_min}', 0, 0, 1)
     oled.text(f'Air Temp: {data["air"]}C', 0, 10, 1)
     oled.text(f'Oven Temp: {data["oven"]}C', 0, 20, 1)
@@ -151,35 +152,38 @@ def main():
     settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
     pid = init_pid(settings['control_temp']) #Creates the pid class
     i = 0
+    time_min = 0
     while True:
-        previous_data = data
-        previous_controlling = controlling
-        previous_relay_value = relay.value
+        prev_time = time_min
         datetime = rtc.datetime
         time_min = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
-        data['air'] = rtc.temperature #obtain the "air" temp from the rtc
-        data['oven'] = tc.read() #obtain the oven temp from the thermocouple
+        if time_min >= prev_time + 1:
+            data['air'] = rtc.temperature #obtain the "air" temp from the rtc
+            data['oven'] = tc.read() #obtain the oven temp from the thermocouple
+            update_oled(oled, data, datetime, controlling, relay.value) #update the oled display
         if not controlling: #if we aren't currently controlling, check if the desired conditions are not met
             relay.value = False
             if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
                 controlling = True
+                update_oled(oled, data, datetime, controlling, relay.value)
                 print('Conditions not met, turning oven PID control on')
         elif controlling:
             if time_min > settings['end_time']:
                 controlling = False
+                update_oled(oled, data, datetime, controlling, relay.value)
                 print('End time exceeded, turning oven PID control off')
             if data['oven'] < settings['control_temp'] and relay.value == False:
                 pid_time = time_min + pid(data['oven']) #set the ending time for the element
+                update_oled(oled, data, datetime, controlling, relay.value)
             if time_min < pid_time:
                 relay.value = True #turn the element on if the pid duration hasn't finished
+                update_oled(oled, data, datetime, controlling, relay.value)
             else:
                 relay.value = False #turn the element off
-        if data != previous_data or controlling != previous_controlling or relay.value != previous_relay_value:
-            update_oled(oled, data, datetime, controlling, relay.value) #update the oled display
+                update_oled(oled, data, datetime, controlling, relay.value)
         if not button.value:
             relay.value = False
             print('Button pressed')
-            #display_text(oled, 'Button\nPressed')
         # i += 1
         # print(i)
         time.sleep(0.01)
