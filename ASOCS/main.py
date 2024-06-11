@@ -31,8 +31,8 @@ def update_oled(oled, data, time, controlling, relay_state):
     hour = add_leading_zeros(time.tm_hour)
     minute = add_leading_zeros(time.tm_min)
     oled.text(f'Time: {hour}:{minute}', 0, 0, 1)
-    oled.text(f'Air Temp: {data["air"]}C', 0, 10, 1)
-    oled.text(f'Oven Temp: {data["oven"]}C', 0, 20, 1)
+    oled.text(f'Air Temp: {data["air"]} C', 0, 10, 1)
+    oled.text(f'Oven Temp: {data["oven"]} C', 0, 20, 1)
     if controlling:
         oled.text(f'Oven Ctrl: Enabled', 0, 30, 1)
     else:
@@ -45,19 +45,17 @@ def update_oled(oled, data, time, controlling, relay_state):
     oled.show()
     return
 
-def data_log():
-    pass
-
 def reset_oled(oled): #clears the oled display
     oled.fill(0)
     oled.show()
     return
 
-def fill_oled_random(oled):
+def fill_oled_random(oled, duration=1):
     for x in range(oled.width):
         for y in range(oled.height):
             oled.pixel(x, y, random.randint(0, 1))
     oled.show()
+    time.sleep(duration)
     return
 
 def display_text(oled, text, duration=1):
@@ -69,30 +67,60 @@ def display_text(oled, text, duration=1):
     reset_oled(oled)
     return
 
-def display_menu(oled, menu, encoder, button):
+def update_menu(oled, selected):
+    oled.fill(0)
+    menu = ['System Time', 'Control Temp', 'Start Time', 'End Time', 'Save Settings', 'Exit']
+    for i in range(len(menu)):
+        if i == selected:
+            oled.text(menu[i], 0, i*10, 1)
+        else:
+            oled.text(menu[i], 0, i*10, 1)
+    oled.show()
+    return
+
+def menu(oled, encoder, button, rtc, settings):
+    fill_oled_random(oled)
     selected = 0
+    update_menu(oled, selected)
     while True:
-        oled.text(menu[selected], 0, 0, 1)
-        oled.show()
-        if button.value:
-            return selected
-        if encoder.position < 0:
-            selected -= 1
-            if selected < 0:
-                selected = len(menu) - 1
-        elif encoder.position > 0:
+        if encoder.position > 0:
             selected += 1
-            if selected > len(menu) - 1:
+            encoder.position = 0
+            print(selected)
+            if selected > 6:
                 selected = 0
-        time.sleep(0.1)
+            update_menu(oled, selected)
+        elif encoder.position < 0:
+            selected -= 1
+            encoder.position = 0
+            print(selected)
+            if selected < 0:
+                selected = 6
+            update_menu(oled, selected)
+        if not button.value:
+            if selected == 0:
+                rtc.datetime = set_time(rtc)
+            elif selected == 1:
+                pass
+            elif selected == 2:
+                pass
+            elif selected == 3:
+                pass
+            elif selected == 4:
+                pass
+            elif selected == 5:
+                pass
+            elif selected == 6:
+                break
+    fill_oled_random(oled, 2)
+    return
 
 def init_hw():
     #Hardware Startup Sequence
     rtc_i2c = busio.I2C(board.GP19, board.GP18)#create an i2c object on pins 18 and 19
     oled_i2c = busio.I2C(board.GP13, board.GP12)#create an i2c object on pins 12 and 13
     oled = adafruit_ssd1306.SSD1306_I2C(128, 64, oled_i2c)#initialize the lcd
-    fill_oled_random(oled)
-    time.sleep(2)
+    fill_oled_random(oled, 3)
     reset_oled(oled)
     print('Display initialized')
     display_text(oled, 'Initializing\nSystem...')
@@ -187,14 +215,13 @@ def main():
         if not button.value:
             relay.value = False
             print('Button pressed')
+            menu(oled, encoder, button, rtc, settings)
         # i += 1
         # print(i)
         time.sleep(0.01)
     
 if __name__ == '__main__':
     main()
-#TODO: Establish multiplier for pid output to time in minutes
-#TODO: Store any user editable params in settings.json
 #TODO: Implement a menu system
 #TODO: Implement a logging system
 #TODO: Implement rotary encoder for menu navigation
