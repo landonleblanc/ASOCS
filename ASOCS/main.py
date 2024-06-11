@@ -9,23 +9,28 @@ import adafruit_ssd1306
 import rotaryio
 from simple_pid import PID
 from max6675 import MAX6675
+#TODO use datetime instead of time???
 
-
-def set_time(rtc):
-    #This function is currently useless
-    #TODO: make cli entry better
-    if rtc.datetime.tm_year == 0: #users sets the time if there isn't one
-        print('Enter the current date and time in the following format then press enter:\n YYYY,MM,DD,HH,MM,SS,WDAY,DOY')
-        t = input()
-        t = t.split(',') #turn into list
-        t.append(-1)#add dst to the end of the list
-        t = time.struct_time(t) #structure the user input
-        print(t)
+def set_time(rtc, oled):
+    try:
+        display_text(oled, 'Time reset detected...'}
+        display_text(oled, 'See terminal for instructions')
+        print('Time reset detected, please set the time:')
+        year = int(input('Enter the year: '))
+        month = int(input('Enter the month: '))
+        day = int(input('Enter the day: '))
+        hour = int(input('Enter the hour: '))
+        minute = int(input('Enter the minute: '))
+        t = time.struct_time(year, month, day, hour, minute, 0, 0, 0, 0)
+        print(f'Setting time to {t}')
         rtc.datetime = t #set the time
+    except ValueError:
+        print('Invalid input, please try again')
+        set_time(rtc, oled)
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
-    #TODO make all display functions and hw init functions into a class
+    #TODO make all display functions and hw init functions into a class in submodule
     def add_leading_zeros(num):
         return "{:02d}".format(num)
     oled.fill(0)
@@ -132,6 +137,8 @@ def init_pid(settings):
 def main():
     data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
     rtc, oled, tc, relay, encoder, button = init_hw() #initialize the hardware components
+    if rtc.datetime.tm_year == 0: #users sets the time if there isn't one
+        set_time(rtc, oled) #set the time if it has defaulted
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
     settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
