@@ -13,7 +13,7 @@ from max6675 import MAX6675
 
 def set_time(rtc):
     #This function is currently useless
-    #TODO: Update to be updated via ui
+    #TODO: make cli entry better
     if rtc.datetime.tm_year == 0: #users sets the time if there isn't one
         print('Enter the current date and time in the following format then press enter:\n YYYY,MM,DD,HH,MM,SS,WDAY,DOY')
         t = input()
@@ -58,8 +58,9 @@ def fill_oled_random(oled, duration=1):
     time.sleep(duration)
     return
 
-def display_text(oled, text, duration=1):
+def display_text(oled, text, duration=2):
     text = text.split('\n')
+    fill_oled_random(oled, 1)
     for i in range(len(text)):
         oled.text(text[i], 0, i*10, 1)
     oled.show()
@@ -69,8 +70,8 @@ def display_text(oled, text, duration=1):
 
 def init_hw():
     #Hardware Startup Sequence
-    rtc_i2c = busio.I2C(board.GP19, board.GP18)#create an i2c object on pins 18 and 19
-    oled_i2c = busio.I2C(board.GP13, board.GP12)#create an i2c object on pins 12 and 13
+    rtc_i2c = busio.I2C(board.GP22, board.GP21)#create an i2c object on pins 21(SDA) and 22(SCL)
+    oled_i2c = busio.I2C(board.GP10, board.GP9)#create an i2c object on pins 9(SDA) and 10(SCL)
     oled = adafruit_ssd1306.SSD1306_I2C(128, 64, oled_i2c)#initialize the lcd
     fill_oled_random(oled, 3)
     reset_oled(oled)
@@ -79,13 +80,13 @@ def init_hw():
     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
     #set_time()#set the time if it has defaulted
     print('RTC initialized')
-    tc = MAX6675(board.GP2, board.GP3, board.GP4)
+    tc = MAX6675(board.GP4, board.GP5, board.GP6)
     print('Thermocouple initialized')
     relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
     relay.direction = digitalio.Direction.OUTPUT
     print('Relay initialized')
-    encoder = rotaryio.IncrementalEncoder(board.GP20, board.GP21)
-    button = digitalio.DigitalInOut(board.GP22)
+    encoder = rotaryio.IncrementalEncoder(board.GP14, board.GP15)
+    button = digitalio.DigitalInOut(board.GP17)
     button.direction = digitalio.Direction.INPUT
     button.pull = digitalio.Pull.UP
     print('Rotary encoder initialized')
