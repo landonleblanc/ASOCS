@@ -25,6 +25,7 @@ def set_time(rtc):
     return
 
 def update_oled(oled, data, time, controlling, relay_state):
+    #TODO make all display functions and hw init functions into a class
     def add_leading_zeros(num):
         return "{:02d}".format(num)
     oled.fill(0)
@@ -122,8 +123,8 @@ def save_settings(settings):
         print('Error saving settings')
     return False
 
-def init_pid(temp):
-    pid = PID(1, 0.1, 0.05, setpoint=temp)
+def init_pid(settings):
+    pid = PID(1, 0.1, 0.05, setpoint=settings['control_temp'])
     pid.auto_mode = True
     pid.output_limits = (0, 10)
     return pid
@@ -134,7 +135,7 @@ def main():
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
     settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
-    pid = init_pid(settings['control_temp']) #Creates the pid class
+    pid = init_pid(settings) #Creates the pid class
     time_min = 0
     while True:
         prev_time = time_min
