@@ -67,54 +67,6 @@ def display_text(oled, text, duration=1):
     reset_oled(oled)
     return
 
-def update_menu(oled, selected):
-    oled.fill(0)
-    menu = ['System Time', 'Control Temp', 'Start Time', 'End Time', 'Save Settings', 'Exit']
-    for i in range(len(menu)):
-        if i == selected:
-            oled.text(menu[i], 0, i*10, 1)
-        else:
-            oled.text(menu[i], 0, i*10, 1)
-    oled.show()
-    return
-
-def menu(oled, encoder, button, rtc, settings):
-    fill_oled_random(oled)
-    selected = 0
-    update_menu(oled, selected)
-    while True:
-        if encoder.position > 0:
-            selected += 1
-            encoder.position = 0
-            print(selected)
-            if selected > 6:
-                selected = 0
-            update_menu(oled, selected)
-        elif encoder.position < 0:
-            selected -= 1
-            encoder.position = 0
-            print(selected)
-            if selected < 0:
-                selected = 6
-            update_menu(oled, selected)
-        if not button.value:
-            if selected == 0:
-                rtc.datetime = set_time(rtc)
-            elif selected == 1:
-                pass
-            elif selected == 2:
-                pass
-            elif selected == 3:
-                pass
-            elif selected == 4:
-                pass
-            elif selected == 5:
-                pass
-            elif selected == 6:
-                break
-    fill_oled_random(oled, 2)
-    return
-
 def init_hw():
     #Hardware Startup Sequence
     rtc_i2c = busio.I2C(board.GP19, board.GP18)#create an i2c object on pins 18 and 19
@@ -182,7 +134,6 @@ def main():
     controlling = False #whether or not the oven needs to be controlled
     settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
     pid = init_pid(settings['control_temp']) #Creates the pid class
-    i = 0
     time_min = 0
     while True:
         prev_time = time_min
@@ -212,16 +163,7 @@ def main():
             else:
                 relay.value = False #turn the element off
                 update_oled(oled, data, datetime, controlling, relay.value)
-        if not button.value:
-            relay.value = False
-            print('Button pressed')
-            menu(oled, encoder, button, rtc, settings)
-        # i += 1
-        # print(i)
         time.sleep(0.01)
     
 if __name__ == '__main__':
     main()
-#TODO: Implement a menu system
-#TODO: Implement a logging system
-#TODO: Implement rotary encoder for menu navigation
