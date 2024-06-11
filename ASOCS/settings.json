@@ -1,5 +1,8 @@
 {
     "control_temp": 50, 
     "start_time": 660,
-    "end_time": 1020
+    "end_time": 1020,
+    "kP": 1,
+    "kI": 0.1,
+    "kD": 0.1
 }

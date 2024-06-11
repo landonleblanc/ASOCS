@@ -124,7 +124,7 @@ def save_settings(settings):
     return False
 
 def init_pid(settings):
-    pid = PID(1, 0.1, 0.05, setpoint=settings['control_temp'])
+    pid = PID(settings['kP'], settings['kI'], settings['kD'], setpoint=settings['control_temp'])
     pid.auto_mode = True
     pid.output_limits = (0, 10)
     return pid
