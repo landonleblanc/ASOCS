@@ -47,7 +47,7 @@ def update_oled(oled, data, time, controlling, relay_state):
         oled.text(f'Element: On', 0, 40, 1)
     else:
         oled.text(f'Element: Off', 0, 40, 1)
-    oled.text(f'Press select for menu', 0, 50, 1)
+    oled.text(f'Press button to toggle', 0, 50, 1)
     oled.show()
     return
 
@@ -66,7 +66,6 @@ def fill_oled_random(oled, duration=1):
 
 def display_text(oled, text, duration=2):
     text = text.split('\n')
-    fill_oled_random(oled, 1)
     for i in range(len(text)):
         oled.text(text[i], 0, i*10, 1)
     oled.show()
@@ -172,6 +171,13 @@ def main():
             else:
                 relay.value = False #turn the element off
                 update_oled(oled, data, datetime, controlling, relay.value)
+        if button.value == False:  
+            if controlling:
+                display_text(oled, 'Control Disabled')
+                controlling = False
+            else:
+                display_text(oled, 'Control Enabled')
+                controlling = True
         time.sleep(0.01)
     
 if __name__ == '__main__':
