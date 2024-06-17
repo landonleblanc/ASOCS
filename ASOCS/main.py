@@ -12,6 +12,7 @@ from max6675 import MAX6675
 #TODO use datetime instead of time???
 
 def set_time(rtc, oled):
+    #TODO Add some sort of flag to force set_time
     try:
         display_text(oled, 'Time reset detected...')
         display_text(oled, 'See terminal for instructions')
@@ -66,6 +67,7 @@ def fill_oled_random(oled, duration=1):
 
 def display_text(oled, text, duration=2):
     text = text.split('\n')
+    reset_oled(oled)
     for i in range(len(text)):
         oled.text(text[i], 0, i*10, 1)
     oled.show()
@@ -173,10 +175,12 @@ def main():
                 update_oled(oled, data, datetime, controlling, relay.value)
         if button.value == False:  
             if controlling:
-                display_text(oled, 'Control Disabled')
+                display_text(oled, 'Oven Control:\nDisabled')
+                relay.value = False
+                update_oled(oled, data, datetime, False, relay.value)
                 controlling = False
             else:
-                display_text(oled, 'Control Enabled')
+                display_text(oled, 'Oven Control:\nEnabled')
                 controlling = True
         time.sleep(0.01)
     
