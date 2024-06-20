@@ -155,13 +155,7 @@ def main():
             data['oven'] = tc.read() #obtain the oven temp from the thermocouple
             update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
         if enabled:
-            if not controlling: #if we aren't currently controlling, check if the desired conditions are not met
-                relay.value = False
-                if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
-                    controlling = True
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('Conditions not met, turning oven PID control on')
-            elif controlling:
+            if controlling:
                 if time_min > settings['end_time']:
                     controlling = False
                     update_oled(oled, data, datetime, controlling, relay.value, enabled)
@@ -175,15 +169,21 @@ def main():
                 else:
                     relay.value = False #turn the element off
                     update_oled(oled, data, datetime, controlling, relay.value, enabled)
+            else:
+                relay.value = False
+                if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
+                    controlling = True
+                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                    print('Conditions not met, turning oven PID control on')
         if button.value == False:  
             if enabled:
                 display_text(oled, 'Oven Control:\nDisabled')
                 relay.value = False
                 enabled = False
-                update_oled(oled, data, datetime, controlling, relay.value, enabled)
             else:
                 display_text(oled, 'Oven Control:\nEnabled')
                 enabled = True
+            update_oled(oled, data, datetime, controlling, relay.value, enabled)
         time.sleep(0.01)
     
 if __name__ == '__main__':
