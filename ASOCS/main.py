@@ -45,10 +45,10 @@ def update_oled(oled, data, time, controlling, relay_state):
     else:
         oled.text(f'Oven Ctrl: Disabled', 0, 30, 1)
     if relay_state:
-        oled.text(f'Element: On', 0, 40, 1)
+        oled.text(f'Status: Heating', 0, 40, 1)
     else:
-        oled.text(f'Element: Off', 0, 40, 1)
-    oled.text(f'Press button to toggle', 0, 50, 1)
+        oled.text(f'Status: Idle', 0, 40, 1)
+    oled.text(f'Press to toggle control', 0, 50, 1)
     oled.show()
     return
 
