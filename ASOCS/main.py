@@ -111,7 +111,14 @@ def load_settings(oled):
         display_text(oled, 'Settings\nLoaded')
         return settings
     except:
-        settings = {'control_temp': 50, 'start_time': 660, 'end_time': 1020}
+        settings = {
+            'control_temp': 50, 
+            'start_time': 660, 
+            'end_time': 1020, 
+            'kP': 1,
+            'kI': 0.1,
+            'kD': 0.1,
+            'reset_time': False}
         with open('settings.json', 'w') as f:
             json.dump(settings, f)
         print('Settings not found, using defaults')
@@ -138,7 +145,7 @@ def init_pid(settings):
 def main():
     data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
     rtc, oled, tc, relay, encoder, button = init_hw() #initialize the hardware components
-    if rtc.datetime.tm_year == 0: #users sets the time if there isn't one
+    if rtc.datetime.tm_year <= 2000: #users sets the time if there isn't one
         set_time(rtc, oled) #set the time if it has defaulted
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
