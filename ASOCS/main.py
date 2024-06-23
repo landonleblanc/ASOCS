@@ -180,6 +180,7 @@ def main():
     data['oven'] = tc.read() #obtain the oven temp from the thermocouple
     datetime = rtc.datetime
     update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
+    print('Startup complete, entering main loop...')
     while True:
         prev_time = time_min
         datetime = rtc.datetime
@@ -187,6 +188,7 @@ def main():
         if time_min >= prev_time + 1:
             data['air'] = rtc.temperature #obtain the "air" temp from the rtc
             data['oven'] = tc.read() #obtain the oven temp from the thermocouple
+            print(f'Time:{datetime.tm_hour}:{datetime.tm_min} Air: {data["air"]} C Oven: {data["oven"]} C')
             update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
         if enabled:
             if controlling:
