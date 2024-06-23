@@ -199,14 +199,17 @@ def main():
                 if data['oven'] < settings['control_temp'] and relay.value == False:
                     pid_time = time_min + pid(data['oven']) #set the ending time for the element
                     update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                    print('Turning on oven element')
                 if time_min < pid_time:
-                    relay.value = True #turn the element on if the pid duration hasn't finished
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('Turning on heat element')
+                    if relay.value == False:
+                        relay.value = True #turn the element on if the pid duration hasn't finished
+                        update_oled(oled, data, datetime, controlling, relay.value, enabled)
                 else:
-                    relay.value = False #turn the element off
-                    print('Turning off heat element')
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                    if relay.value == True:
+                        relay.value = False #turn the element off
+                        update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                    print('Turning off oven element')
+                # update_oled(oled, data, datetime, controlling, relay.value, enabled)
             else:
                 relay.value = False
                 if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
