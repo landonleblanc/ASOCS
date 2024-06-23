@@ -7,24 +7,26 @@ import digitalio
 import adafruit_ds3231
 import adafruit_ssd1306
 import rotaryio
+import storage
 from simple_pid import PID
 from max6675 import MAX6675
 #TODO use datetime instead of time???
 
 def set_time(rtc, oled):
-    #TODO Add some sort of flag to force set_time
     try:
-        display_text(oled, 'Time reset detected...')
-        display_text(oled, 'See terminal for instructions')
+        display_text(oled, 'Time reset\ndetected...')
+        display_text(oled, 'See terminal\nfor instructions')
         print('Time reset detected, please set the time:')
         year = int(input('Enter the year: '))
         month = int(input('Enter the month: '))
         day = int(input('Enter the day: '))
         hour = int(input('Enter the hour: '))
         minute = int(input('Enter the minute: '))
-        t = time.struct_time(year, month, day, hour, minute, 0, 0, 0, 0)
+        t = time.struct_time((year, month, day, hour, minute, 0, 0, 0, 0))
         print(f'Setting time to {t}')
         rtc.datetime = t #set the time
+        print('Time set successfully')
+        print("Disconnect the USB from the PC and connect to the power supply")
     except ValueError:
         print('Invalid input, please try again')
         set_time(rtc, oled)
@@ -110,7 +112,8 @@ def load_settings(oled):
         print('Settings loaded successfully')
         display_text(oled, 'Settings\nLoaded')
         return settings
-    except:
+    except Exception as e:
+        print(e)
         settings = {
             'control_temp': 50, 
             'start_time': 660, 
@@ -132,9 +135,20 @@ def save_settings(settings):
         with open('settings.json', 'r') as f:
             assert json.load(f) == settings 
         return True
-    except:
+    except Exception as e:
+        print(e)
         print('Error saving settings')
     return False
+
+def make_filesystem_writable():
+    try:
+        if storage.getmount("/").readonly:
+            # Remount the filesystem as read-write
+            storage.remount("/", readonly=False)
+            print("Filesystem remounted as writable")
+    except Exception as e:
+        print(e)
+        print("Failed to remount filesystem as writable")
 
 def init_pid(settings):
     pid = PID(settings['kP'], settings['kI'], settings['kD'], setpoint=settings['control_temp'])
@@ -142,7 +156,7 @@ def init_pid(settings):
     pid.output_limits = (0, 10)
     return pid
 
-def main():
+def main(): 
     data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
     rtc, oled, tc, relay, encoder, button = init_hw() #initialize the hardware components
     if rtc.datetime.tm_year <= 2000: #users sets the time if there isn't one
@@ -150,9 +164,17 @@ def main():
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
     settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
+    # if settings['reset_time'] == True:
+    #     set_time(rtc, oled)
+    #     settings['reset_time'] = False
+    #     save_settings(settings)
     pid = init_pid(settings) #Creates the pid class
     time_min = 0
     enabled = False
+    data['air'] = rtc.temperature #obtain the "air" temp from the rtc
+    data['oven'] = tc.read() #obtain the oven temp from the thermocouple
+    datetime = rtc.datetime
+    update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
     while True:
         prev_time = time_min
         datetime = rtc.datetime
@@ -185,10 +207,12 @@ def main():
         if button.value == False:  
             if enabled:
                 display_text(oled, 'Oven Control:\nDisabled')
+                print('Oven control disabled')
                 relay.value = False
                 enabled = False
             else:
                 display_text(oled, 'Oven Control:\nEnabled')
+                print('Oven control enabled')
                 enabled = True
             update_oled(oled, data, datetime, controlling, relay.value, enabled)
         time.sleep(0.01)
