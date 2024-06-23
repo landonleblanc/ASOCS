@@ -122,6 +122,7 @@ def load_settings(oled):
             'kI': 0.1,
             'kD': 0.1,
             'reset_time': False}
+        make_filesystem_writable()
         with open('settings.json', 'w') as f:
             json.dump(settings, f)
         print('Settings not found, using defaults')
@@ -129,15 +130,19 @@ def load_settings(oled):
         return settings
 
 def save_settings(settings):
-    with open('settings.json', 'w') as f:
-        json.dump(settings, f)
+    make_filesystem_writable()
+    try:
+        with open('settings.json', 'w') as f:
+            json.dump(settings, f)
+    except Exception as e:
+        print(e)
+        print('Error saving settings')
     try:
         with open('settings.json', 'r') as f:
             assert json.load(f) == settings 
         return True
     except Exception as e:
-        print(e)
-        print('Error saving settings')
+        print(f'Settings did not match: {e}')
     return False
 
 def make_filesystem_writable():
