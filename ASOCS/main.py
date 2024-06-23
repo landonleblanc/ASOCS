@@ -50,7 +50,7 @@ def update_oled(oled, data, time, controlling, relay_state, enabled):
         oled.text(f'Status: Heating', 0, 40, 1)
     else:
         oled.text(f'Status: Idle', 0, 40, 1)
-    oled.text(f'Press to toggle control', 0, 50, 1)
+    oled.text(f'Toggle control -->', 0, 50, 1)
     oled.show()
     return
 
@@ -195,8 +195,10 @@ def main():
                 if time_min < pid_time:
                     relay.value = True #turn the element on if the pid duration hasn't finished
                     update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                    print('Turning on heat element')
                 else:
                     relay.value = False #turn the element off
+                    print('Turning off heat element')
                     update_oled(oled, data, datetime, controlling, relay.value, enabled)
             else:
                 relay.value = False
