@@ -1,0 +1,27 @@
+# Modules and Pinout
+## DS3231 RTC
+- GND(PIN 23)
+- VCC
+- SCL > I2C0 SCL(PIN 22)
+- SDA > I2C0 SDA(PIN 21)
+## MAX6675 Thermocouple
+- GND(PIN18)
+- VCC
+- SCK > SPI0 SCK(PIN 4)
+- CS > SPI0 TX(PIN 5)
+- SO > SPI0 RX(PIN 6)
+## SSD1306 OLED
+- GND(PIN 8)
+- VCC
+- SCL > I2C1 SCL(PIN 10)
+- SDA > I2C1 SDA(PIN 9)
+## Rotary Encoder w/Button
+- GND(PIN18)
+- VCC
+- SW(button) > GPIO13(PIN17)
+- DT > GP14(PIN14)
+- CLK > GP15(PIN15)
+## Relay
+- GND(PIN 33)
+- VCC
+- IN > GP28(PIN 34)
