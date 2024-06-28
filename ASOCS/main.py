@@ -165,6 +165,7 @@ def main():
     data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
     rtc, oled, tc, relay, encoder, button = init_hw() #initialize the hardware components
     if rtc.datetime.tm_year <= 2000: #users sets the time if there isn't one
+        print(rtc.datetime)
         set_time(rtc, oled) #set the time if it has defaulted
     pid_time = 0 #How long the element should be turned on for in minutes
     controlling = False #whether or not the oven needs to be controlled
