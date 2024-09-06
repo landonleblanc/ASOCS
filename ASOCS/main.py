@@ -12,6 +12,37 @@ from simple_pid import PID
 from max6675 import MAX6675
 #TODO use datetime instead of time???
 
+class Data:
+    def __init__(self, rtc: object, tc: object) -> None:
+        self.rtc = rtc
+        self.tc = tc
+        self.air = 0
+        self.oven = 0
+        return
+    def update(self) -> None:
+        self.air = self.rtc.temperature
+        self.oven = self.tc.read()
+        return
+    
+class Status:
+    def __init__(self):
+        self.controlling = False
+        self.relay_state = False
+        self.enabled = False
+        return
+    
+class Time:
+    def __init__(self, rtc: object) -> None:
+        self.datetime = rtc.datetime
+        self.timemin = int(self.datetime.tm_hour*60 + self.datetime.tm_min)
+        return
+    def update(self, rtc: object) -> None:
+        self.datetime = rtc.datetime
+        self.timemin = int(self.datetime.tm_hour*60 + self.datetime.tm_min)
+        return
+
+
+
 def set_time(rtc, oled):
     try:
         display_text(oled, 'Time reset\ndetected...')
