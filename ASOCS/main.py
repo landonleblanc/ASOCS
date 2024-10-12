@@ -1,12 +1,14 @@
 import sys
 import time
 import json
+# import yaml
 import board
 import busio
 import digitalio
 import adafruit_ds3231
 import storage
 from max6675 import MAX6675
+import neopixel
 
 
 class Data:
@@ -84,16 +86,19 @@ class Serial:
 
 def init_hw():
     #Hardware Startup Sequence
-    rtc_i2c = busio.I2C(sda=board.GP16, scl=board.GP17)#create an i2c object on pins 21(SDA) and 22(SCL)
+    rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)#create an i2c object on pins 21(SDA) and 22(SCL)
     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
     print('RTC initialized')
-    tc = MAX6675(board.GP2, board.GP3, board.GP4)
+    tc = MAX6675(board.GP18, board.GP19, board.GP16)
     print('Thermocouple initialized')
     relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
     relay.direction = digitalio.Direction.OUTPUT
     print('Relay initialized')
-    led = digitalio.DigitalInOut(board.GP27) #assign gpio pin 27 to the led
-    led.direction = digitalio.Direction.OUTPUT
+    # Initialize the NeoPixel LED
+    num_pixels = 4
+    led = neopixel.NeoPixel(board.GP22, num_pixels)
+    # led = digitalio.DigitalInOut(board.GP27) #assign gpio pin 27 to the led
+    # led.direction = digitalio.Direction.OUTPUT
     print('LED initialized')
     print('System Initialized')
     return rtc, tc, relay, led
