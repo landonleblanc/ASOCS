@@ -1,88 +1,31 @@
-import sys
 import time
-import json
-# import yaml
+from adafruit_datetime import datetime, timedelta
 import board
 import busio
 import digitalio
+import supervisor
 import adafruit_ds3231
 import storage
 from max6675 import MAX6675
 import neopixel
 
-
 class Data:
-    def __init__(self, rtc: object, tc: object) -> None:
-        self.rtc = rtc
-        self.tc = tc
+    def __init__(self):
         self.air = 0
         self.oven = 0
         self.last_update = None
-        
-    def update(self) -> None:
-        self.air = self.rtc.temperature
-        self.oven = self.tc.read()
-        self.last_update = self.rtc.datetime
     
-# class Time:
-#     def __init__(self, rtc: object) -> None:
-#         self.rtc = rtc
-#         self.datetime = None
-#         self.minutes = None
-#         self.update()
-
-#     def update(self) -> None:
-#         self.datetime = self.rtc.datetime
-#         self.timemin = int(self.datetime.tm_hour*60 + self.datetime.tm_min)
-
-#     def set_time(self, hour: int, minute: int) -> None:
-#         t = time.struct_time((self.datetime.tm_year, self.datetime.tm_mon, self.datetime.tm_mday, hour, minute, 0, 0, 0, 0))
-#         self.rtc.datetime = t
-#         self.update()
-
-#     def formatted(self) -> str:
-#         return f'{self.datetime.tm_hour}:{self.datetime.tm_min}'
+    def update(self, rtc, tc):
+        self.air = rtc.temperature
+        self.oven = tc.read()
+        self.next_update = datetime(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday, rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec) + timedelta(seconds=30) 
 
 class Settings:
-    def __init__(self):
+    def __init__(self, year, month, day):
         self.control_temp = None
-        self.start_time = None
-        self.end_time = None
+        self.start_time = datetime(year, month, day, 11, 0, 0)
+        self.end_time = datetime(year, month, day, 21, 45, 0)
         self.pid = False
-
-    def load(self):
-        try:
-            with open('settings.json', 'r') as f:
-                settings = json.load(f)
-            self.control_temp = settings['control_temp']
-            self.start_time = settings['start_time']
-            self.end_time = settings['end_time']
-            self.pid = settings['pid']
-            print('Settings loaded successfully')
-        except Exception as e:
-            print(e)
-            print('Settings not found')
-    
-    def save(self):
-        make_filesystem_writable()
-        settings = {
-            'control_temp': self.control_temp,
-            'start_time': self.start_time,
-            'end_time': self.end_time,
-            'pid': self.pid
-        }
-        try:
-            with open('settings.json', 'w') as f:
-                json.dump(settings, f)
-        except Exception as e:
-            print(e)
-            print('Error saving settings')
-
-class Serial:
-    def __init__(self):
-        pass
-
-
 
 def init_hw():
     #Hardware Startup Sequence
@@ -103,28 +46,20 @@ def init_hw():
     print('System Initialized')
     return rtc, tc, relay, led
 
-def make_filesystem_writable():
-    try:
-        if storage.getmount("/").readonly:
-            # Remount the filesystem as read-write
-            storage.remount("/", readonly=False)
-            print("Filesystem remounted as writable")
-    except Exception as e:
-        print(e)
-        print("Failed to remount filesystem as writable")
-
 def main(): 
     rtc, tc, relay, led = init_hw() #initialize the hardware components
-    data = Data(rtc, tc) #initialize the data class
-    settings = Settings() #initialize the settings class
-    settings.load() #load the settings from the settings.json file or use defaults if unsuccessful
-    data.update() #update the data class with the current values
+    settings = Settings(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday) #initialize the settings class
+    # settings.load() #load the settings from the settings.json file or use defaults if unsuccessful
+    current_time = datetime(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday, rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec)
+    data = Data() #initialize the data class
+    data.update(rtc, tc) #update the data class with the current values
     print('Startup complete, entering main loop...')
     while True:
-        current_time = rtc.datetime
-        if current_time >= data.last_update + 1:
-            data.update()
-            print(f'[{current_time}]: {data.air}°C Oven: {data.oven}°C')
+        led.show()
+        current_time = datetime(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday, rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec)
+        if current_time >= data.next_update:
+            data.update(rtc, tc)
+            print(f'[{current_time}]: Air: {data.air}°C Oven: {data.oven}°C')
         if current_time > settings.start_time and current_time < settings.end_time:
             if not settings.pid:
                 if data.oven < settings.control_temp:
@@ -138,3 +73,14 @@ def main():
     
 if __name__ == '__main__':
     main()
+    # if supervisor.runtime.serial_connected:
+    #     while True:
+    #         time.sleep(10)
+    #         input('Enter debug mode? y/n?')
+    #         if input == 'y':
+    #             main()
+    #         else:
+    #             continue     
+    # else:
+    #     print('Not connected to serial, running main loop...')
+    #     main()
