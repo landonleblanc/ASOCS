@@ -37,6 +37,7 @@ class LEDs:
         time.sleep(0.5)
 
     def fade(self, color):
+        #TODO add colors
         for i in range(0, 255, 5):
             self.led.fill((i, i, i))
             time.sleep(0.01)
@@ -85,7 +86,6 @@ class ASOCS:
         self.oven_temp = 0
 
     def init_hw(self):
-        #Hardware Startup Sequence
         rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
         self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
         print('RTC initialized')
@@ -100,8 +100,7 @@ class ASOCS:
     def update_data(self):
         self.air_temp = self.rtc.temperature
         self.oven_temp = self.tc.read()
-        self.next_update = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec) + timedelta(seconds=30)
-
+        self.next_update = self.current_time + timedelta(seconds=30)
     def load_settings(self):
         pass
 
@@ -113,71 +112,43 @@ def main():
     asocs.init_hw()
     asocs.load_settings()
     print('Startup complete, entering main loop...')
+    asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
     asocs.update_data()
     while True:
-        asocs.update_data()
+        #update the current time
+        asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
+        #print the current time and temps over serial
         print(f'[{asocs.current_time}]: Air: {asocs.air_temp}°C Oven: {asocs.oven_temp}°C')
-        time.sleep(0.01)    
+        #check if we need to update the data, updating if needed
+        if asocs.current_time > asocs.next_update:
+            asocs.update_data()
+        
+        #check we are within the time window for oven control
+        if asocs.current_time > asocs.start_time and asocs.current_time < asocs.end_time:
 
-
-
-# def init_hw():
-#     #Hardware Startup Sequence
-#     rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)#create an i2c object on pins 21(SDA) and 22(SCL)
-#     rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
-#     print('RTC initialized')
-#     tc = MAX6675(board.GP18, board.GP19, board.GP16)
-#     print('Thermocouple initialized')
-#     relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
-#     relay.direction = digitalio.Direction.OUTPUT
-#     print('Relay initialized')
-#     # Initialize the NeoPixel LED
-#     num_pixels = 4
-#     led = neopixel.NeoPixel(board.GP22, num_pixels)
-#     # led = digitalio.DigitalInOut(board.GP27) #assign gpio pin 27 to the led
-#     # led.direction = digitalio.Direction.OUTPUT
-#     print('LED initialized')
-#     print('System Initialized')
-#     return rtc, tc, relay, led
-
-# def main(): 
-#     rtc, tc, relay, led = init_hw() #initialize the hardware components
-#     settings = Settings(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday) #initialize the settings class
-#     # settings.load() #load the settings from the settings.json file or use defaults if unsuccessful
-#     current_time = datetime(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday, rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec)
-#     data = Data() #initialize the data class
-#     data.update(rtc, tc) #update the data class with the current values
-#     print('Startup complete, entering main loop...')
-#     while True:
-#         led.show()
-#         current_time = datetime(rtc.datetime.tm_year, rtc.datetime.tm_mon, rtc.datetime.tm_mday, rtc.datetime.tm_hour, rtc.datetime.tm_min, rtc.datetime.tm_sec)
-#         if current_time >= data.next_update:
-#             data.update(rtc, tc)
-#             print(f'[{current_time}]: Air: {data.air}°C Oven: {data.oven}°C')
-#         if current_time > settings.start_time and current_time < settings.end_time:
-#             if not settings.pid:
-#                 if data.oven < settings.control_temp:
-#                     relay.value = True
-#                     led.value = True
-#                 else:
-#                     relay.value = False
-#                     led.value = False
-
-#         time.sleep(0.01)
+            #turn on the heating element if the oven temp is less than the control temp, otherwise keep it off
+            if asocs.oven_temp < asocs.control_temp:
+                asocs.relay.on()
+                asocs.led.solid((255, 0, 0))
+            else:
+                asocs.relay.off()
+                asocs.led.off()
+        time.sleep(0.01)
 
 def standby():
-    pass
+        while True:
+            time.sleep(10)
+            input('Enter debug mode? y/n?')
+            if input() == 'y':
+                main()
+            else:
+                continue 
 
 if __name__ == '__main__':
     main()
-    # if supervisor.runtime.serial_connected:
-    #     while True:
-    #         time.sleep(10)
-    #         input('Enter debug mode? y/n?')
-    #         if input == 'y':
-    #             main()
-    #         else:
-    #             continue     
-    # else:
-    #     print('Not connected to serial, running main loop...')
-    #     main()
+    if supervisor.runtime.serial_connected:
+        #enter standby mode if serial is connected
+        standby()
+    else:
+        #enter normal operation if serial is not connected
+        main()
