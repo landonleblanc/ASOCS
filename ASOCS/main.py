@@ -141,7 +141,10 @@ def main():
     asocs.init_hw()
     asocs.led.rainbow(duration=2)
     asocs.led.off()
-    time.sleep(1)
+    if asocs.rtc.lost_power:
+        print('RTC lost power, time is not accurate')
+        while True:
+            asocs.led.blink(color=(255, 0, 0), rate=0.4)
     asocs.load_settings()
 
     print('Startup complete, entering main loop...')
