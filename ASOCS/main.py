@@ -100,10 +100,12 @@ class LEDs:
 
 class ASOCS:
     def __init__(self):
-        self.rtc = None
-        self.tc = None
-        self.relay = None
-        self.led = None
+        '''Initialize the ASOCS class and initialize the hardware components.'''
+        rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
+        self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
+        self.tc = MAX6675(board.GP18, board.GP19, board.GP16)
+        self.relay = Relay(board.GP28)
+        self.led = LEDs(board.GP22)
 
         self.current_time = None
         self.next_update = None
@@ -114,21 +116,6 @@ class ASOCS:
 
         self.air_temp = 0
         self.oven_temp = 0
-
-    def init_hw(self):
-        '''Initialize the hardware components of the ASOCS device.'''
-        #TODO add error handling
-        #TODO change to pins to parameters instead of being hard coded
-        rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
-        self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
-        print('RTC initialized')
-        self.tc = MAX6675(board.GP18, board.GP19, board.GP16)
-        print('Thermocouple initialized')
-        self.relay = Relay(board.GP28)
-        print('Relay initialized')
-        self.led = LEDs(board.GP22)
-        print('LED initialized')
-        print('System Initialized')
 
     def update_data(self):
         '''Update the current air and oven temperatures. Set the time for the next sensor update'''
@@ -173,7 +160,6 @@ def main():
     temperature and the time window for the oven to be on.
     '''
     asocs = ASOCS()
-    asocs.init_hw()
     asocs.led.rainbow(duration=2)
     asocs.led.off()
     if asocs.rtc.lost_power:
@@ -218,7 +204,6 @@ def standby():
     else:
         print('Entering standby mode...')
         asocs = ASOCS()
-        asocs.init_hw()
         asocs.led.fade(color=(54, 1, 63))
 
                 
