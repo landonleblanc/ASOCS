@@ -54,23 +54,26 @@ class LEDs:
             self.led.fill((0, 0, 0))
             time.sleep(rate)
 
-    def fade(self, color: tuple, rate: float = 1):
+    def fade(self, color: tuple, rate: float = 1, blinks: int = 5):
         '''Fade the LEDs in and out.
         Parameters:
             color (tuple): RGB color tuple (0-255)
-            rate (float): Time between peaks in seconds'''
-        for i in range(0, 255, 5):
-            r = int(color[0] * i / 255)
-            g = int(color[1] * i / 255)
-            b = int(color[2] * i / 255)
-            self.led.fill((r, g, b))
-            time.sleep(0.01)
-        for i in range(255, 0, -5):
-            r = int(color[0] * i / 255)
-            g = int(color[1] * i / 255)
-            b = int(color[2] * i / 255)
-            self.led.fill((r, g, b))
-            time.sleep(0.01)
+            rate(float): Time between peaks in seconds
+            blinks (int): Number of blinks'''
+        step_time = rate / (2 * 255 / 5)  # Calculate the time for each step
+        for _ in range(blinks):
+            for i in range(0, 255, 5):
+                r = int(color[0] * i / 255)
+                g = int(color[1] * i / 255)
+                b = int(color[2] * i / 255)
+                self.led.fill((r, g, b))
+                time.sleep(step_time)
+            for i in range(255, 0, -5):
+                r = int(color[0] * i / 255)
+                g = int(color[1] * i / 255)
+                b = int(color[2] * i / 255)
+                self.led.fill((r, g, b))
+                time.sleep(step_time)
 
     def rainbow(self, duration: int = 5):
         '''Cycle through the rainbow colors.
@@ -86,9 +89,11 @@ class LEDs:
             (255, 255, 255) # White
         ]
         for color in colors:
-            self.fade(color, rate=duration/len(colors))
+            self.fade(color, rate=duration/len(colors), blinks=1)
 
 class ASOCS:
+    '''Main class for the ASOCS device. This class will control the hardware components
+    and manage the temperature control.'''
     def __init__(self):
         '''Initialize the ASOCS class and initialize the hardware components.'''
         rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
