@@ -204,7 +204,8 @@ def standby():
     else:
         print('Entering standby mode...')
         asocs = ASOCS()
-        asocs.led.fade(color=(54, 1, 63))
+        while True:
+            asocs.led.fade(color=(54, 1, 63), rate=1, blinks=5)
 
                 
 
