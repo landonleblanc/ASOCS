@@ -124,16 +124,21 @@ class ASOCS:
         try:
             with open('SETTINGS.json', 'r') as f:
                 settings = json.load(f)
-                self.control_temp = settings['temperature(C)']
-                self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['start_hour'], settings['start_minute'])
-                self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['end_hour'], settings['end_minute'])
-                if settings['reset_time_hour'] != 0 and settings['reset_time_minute'] != 0:
-                    self.update_time(settings['reset_time_hour'], settings['reset_time_minute'])
-                print('Settings loaded')
-                self.led.blink(color=(0, 255, 0), rate=0.4)
+            self.control_temp = settings['temperature(C)']
+            self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['start_hour'], settings['start_minute'])
+            self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['end_hour'], settings['end_minute'])
+            if settings['reset_time_hour'] != 0 and settings['reset_time_minute'] != 0:
+                self.update_time(settings['reset_time_hour'], settings['reset_time_minute'])
+                settings['reset_time_hour'] = 0
+                settings['reset_time_minute'] = 0
+                with open('SETTINGS.json', 'w') as f:
+                    json.dump(settings, f)
+            print('Settings loaded')
+            self.led.blink(color=(0, 255, 0), rate=0.4)
         
-        except Exception:
+        except Exception as e:
             print('Failed to load settings, using defaults')
+            print(e)
             self.control_temp = 60
             self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 8, 0)
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
