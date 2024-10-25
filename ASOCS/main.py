@@ -59,12 +59,17 @@ class LEDs:
         Parameters:
             color (tuple): RGB color tuple (0-255)
             rate (float): Time between peaks in seconds'''
-        #TODO add colors
         for i in range(0, 255, 5):
-            self.led.fill((i, i, i))
+            r = int(color[0] * i / 255)
+            g = int(color[1] * i / 255)
+            b = int(color[2] * i / 255)
+            self.led.fill((r, g, b))
             time.sleep(0.01)
         for i in range(255, 0, -5):
-            self.led.fill((i, i, i))
+            r = int(color[0] * i / 255)
+            g = int(color[1] * i / 255)
+            b = int(color[2] * i / 255)
+            self.led.fill((r, g, b))
             time.sleep(0.01)
 
     def rainbow(self, duration: int = 5):
@@ -80,23 +85,8 @@ class LEDs:
             (54, 0, 63),  # Purple
             (255, 255, 255) # White
         ]
-
-        steps = 100
         for color in colors:
-            # Fade in
-            for i in range(steps):
-                r = int(color[0] * i / steps)
-                g = int(color[1] * i / steps)
-                b = int(color[2] * i / steps)
-                self.led.fill((r, g, b))
-                time.sleep(duration / (len(colors) * steps * 2))
-            # Fade out
-            for i in range(steps, 0, -1):
-                r = int(color[0] * i / steps)
-                g = int(color[1] * i / steps)
-                b = int(color[2] * i / steps)
-                self.led.fill((r, g, b))
-                time.sleep(duration / (len(colors) * steps * 2))
+            self.fade(color, rate=duration/len(colors))
 
 class ASOCS:
     def __init__(self):
