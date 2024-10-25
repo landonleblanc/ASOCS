@@ -11,27 +11,43 @@ from max6675 import MAX6675
 import neopixel
 
 class Relay:
+    '''Simple class to control a relay connected to a pin on the board.'''
     def __init__(self, pin):
+        '''
+        Initialize the relay with the pin number.'''
         self.relay = digitalio.DigitalInOut(pin)
         self.relay.direction = digitalio.Direction.OUTPUT
 
     def on(self):
+        '''Turn the relay on.'''
         self.relay.value = True
 
     def off(self):
+        '''Turn the relay off.'''
         self.relay.value = False
 
 class LEDs:
+    '''Class to control a neopixel strip connected to a pin on the board.'''
     def __init__(self, pin):
+        '''Initialize the neopixel strip with the pin number.'''
         self.led = neopixel.NeoPixel(pin, 4)
 
     def off(self):
+        '''Turn off all the LEDs.'''
         self.led.fill((0, 0, 0))
 
     def solid(self, color: tuple):
+        '''Set all the LEDs to a single color.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)'''
         self.led.fill(color)
 
     def blink(self, color: tuple, rate: float = 0.2, blinks: int = 5):
+        '''Blink the LEDs a set number of times.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)
+            rate (float): Time between blinks in seconds
+            blinks (int): Number of blinks'''
         for i in range(blinks):
             self.led.fill(color)
             time.sleep(rate)
@@ -39,6 +55,10 @@ class LEDs:
             time.sleep(rate)
 
     def fade(self, color: tuple, rate: float = 1):
+        '''Fade the LEDs in and out.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)
+            rate (float): Time between peaks in seconds'''
         #TODO add colors
         for i in range(0, 255, 5):
             self.led.fill((i, i, i))
@@ -48,6 +68,9 @@ class LEDs:
             time.sleep(0.01)
 
     def rainbow(self, duration: int = 5):
+        '''Cycle through the rainbow colors.
+        Parameters:
+            duration (int): Time to complete the cycle in seconds'''
         colors = [
             (255, 0, 0),    # Red
             (255, 115, 0),  # Orange
@@ -93,6 +116,9 @@ class ASOCS:
         self.oven_temp = 0
 
     def init_hw(self):
+        '''Initialize the hardware components of the ASOCS device.'''
+        #TODO add error handling
+        #TODO change to pins to parameters instead of being hard coded
         rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
         self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
         print('RTC initialized')
@@ -105,11 +131,14 @@ class ASOCS:
         print('System Initialized')
 
     def update_data(self):
+        '''Update the current air and oven temperatures. Set the time for the next sensor update'''
         self.air_temp = self.rtc.temperature
         self.oven_temp = self.tc.read()
         self.next_update = self.current_time + timedelta(seconds=30)
 
     def load_settings(self):
+        '''Load the settings from the SETTINGS.json file. If the file does not exist or an 
+        error occurs, default settings will be used. Blinks green if successful, red if failed.'''
         try:
             with open('SETTINGS.json', 'r') as f:
                 settings = json.load(f)
@@ -128,15 +157,21 @@ class ASOCS:
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
             self.led.blink(color=(255, 0, 0), rate=0.4)
 
-    def save_settings(self):
-        pass
-
     def update_time(self, hour, minute):
+        '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.
+        Parameters:
+            hour (int): Hour to set the RTC to
+            minute (int): Minute to set the RTC to'''
         self.rtc.datetime = time.struct_time((self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, hour, minute, 0, 0, 0, -1))
         self.current_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec)
         self.led.blink(color=(0, 0, 255), rate=0.4)
 
 def main():
+    '''
+    Main loop for the ASOCS device. This loop will update the current time
+    and check if the oven needs to be turned on or off based on the control
+    temperature and the time window for the oven to be on.
+    '''
     asocs = ASOCS()
     asocs.init_hw()
     asocs.led.rainbow(duration=2)
@@ -171,6 +206,11 @@ def main():
         time.sleep(0.01)
 
 def standby():
+    '''
+    Standby mode is entered when the USB is connected to the device.
+    This mode will wait for the user to press a key to enter debug mode or
+    will enter standby mode during settings configuration.
+    '''
     time.sleep(10)
     input('Enter debug mode? y/n?')
     if input() == 'y':
@@ -185,8 +225,8 @@ def standby():
 
 if __name__ == '__main__':
     main()
-    if supervisor.runtime.serial_connected:
-        #enter standby mode if serial is connected
+    if supervisor.runtime.usb_connected:
+        #enter standby mode if usb is connected
         standby()
     else:
         #enter normal operation if serial is not connected
