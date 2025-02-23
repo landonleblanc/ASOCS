@@ -75,32 +75,16 @@ class LEDs:
                 self.led.fill((r, g, b))
                 time.sleep(step_time)
 
-    def rainbow(self, duration: int = 5):
-        '''Cycle through the rainbow colors.
-        Parameters:
-            duration (int): Time to complete the cycle in seconds'''
-        colors = [
-            (255, 0, 0),    # Red
-            (255, 115, 0),  # Orange
-            (255, 255, 0),  # Yellow
-            (0, 255, 0),    # Green
-            (0, 0, 255),    # Blue
-            (54, 0, 63),  # Purple
-            (255, 255, 255) # White
-        ]
-        for color in colors:
-            self.fade(color, rate=duration/len(colors), blinks=1)
-
 class ASOCS:
     '''Main class for the ASOCS device. This class will control the hardware components
     and manage the temperature control.'''
     def __init__(self):
         '''Initialize the ASOCS class and initialize the hardware components.'''
-        rtc_i2c = busio.I2C(sda=board.GP14, scl=board.GP15)
+        rtc_i2c = busio.I2C(sda=board.GP0, scl=board.GP1)
         self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
         self.tc = MAX6675(board.GP18, board.GP19, board.GP16)
-        self.relay = Relay(board.GP28)
-        self.led = LEDs(board.GP22)
+        self.relay = Relay(board.GP2)
+        self.led = LEDs(board.GP28)
 
         self.current_time = None
         self.next_update = None
@@ -131,10 +115,16 @@ class ASOCS:
                 self.update_time(settings['reset_time_hour'], settings['reset_time_minute'])
                 settings['reset_time_hour'] = 0
                 settings['reset_time_minute'] = 0
+                storage.remount("/", False)
                 with open('SETTINGS.json', 'w') as f:
                     json.dump(settings, f)
+            elif self.rtc.lost_power:
+                print('RTC lost power, time is not accurate')
+                self.led.fade(color=(255, 0, 0), rate=1, blinks=5)
             print('Settings loaded')
-            self.led.blink(color=(0, 255, 0), rate=0.4)
+            # blink the LEDs green to indicate successful settings load
+            self.led.blink(color=(0, 255, 0), rate=0.4, blinks=2)
+            
         
         except Exception as e:
             print('Failed to load settings, using defaults')
@@ -142,7 +132,7 @@ class ASOCS:
             self.control_temp = 60
             self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 8, 0)
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
-            self.led.blink(color=(255, 0, 0), rate=0.4)
+            self.led.blink(color=(255, 150, 0), rate=0.4)
 
     def update_time(self, hour, minute):
         '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.
@@ -151,6 +141,7 @@ class ASOCS:
             minute (int): Minute to set the RTC to'''
         self.rtc.datetime = time.struct_time((self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, hour, minute, 0, 0, 0, -1))
         self.current_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec)
+        # blink the LEDs blue to indicate success
         self.led.blink(color=(0, 0, 255), rate=0.4)
 
 def main():
@@ -160,14 +151,8 @@ def main():
     temperature and the time window for the oven to be on.
     '''
     asocs = ASOCS()
-    asocs.led.rainbow(duration=2)
     asocs.led.off()
-    if asocs.rtc.lost_power:
-        print('RTC lost power, time is not accurate')
-        while True:
-            asocs.led.blink(color=(255, 0, 0), rate=0.4)
     asocs.load_settings()
-
     print('Startup complete, entering main loop...')
     asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
     asocs.update_data()
@@ -185,6 +170,7 @@ def main():
             #turn on the heating element if the oven temp is less than the control temp, otherwise keep it off
             if asocs.oven_temp < asocs.control_temp:
                 asocs.relay.on()
+                # set the LEDs to green if the relay is on
                 asocs.led.solid((0, 255, 0))
             else:
                 asocs.relay.off()
@@ -197,23 +183,16 @@ def standby():
     This mode will wait for the user to press a key to enter debug mode or
     will enter standby mode during settings configuration.
     '''
-    time.sleep(10)
-    input('Enter debug mode? y/n?')
-    if input() == 'y':
-        main()
-    else:
-        print('Entering standby mode...')
-        asocs = ASOCS()
-        while True:
-            asocs.led.fade(color=(54, 1, 63), rate=1, blinks=5)
-
-                
+    asocs = ASOCS()
+    while True:
+        print("Currently in standby mode...")
+        # blink the LEDs purple to indicate standby mode
+        asocs.led.fade(color=(54, 1, 63), rate=1, blinks=5)
 
 if __name__ == '__main__':
-    main()
     if supervisor.runtime.usb_connected:
         #enter standby mode if usb is connected
         standby()
     else:
-        #enter normal operation if serial is not connected
+        #enter normal operation if usb is not connected
         main()
