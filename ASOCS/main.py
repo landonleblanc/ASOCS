@@ -1,265 +1,198 @@
+import time
 import json
-import random
+from adafruit_datetime import datetime, timedelta
 import board
 import busio
-import time
 import digitalio
+import supervisor
 import adafruit_ds3231
-import adafruit_ssd1306
-import rotaryio
 import storage
-from simple_pid import PID
 from max6675 import MAX6675
-#TODO use datetime instead of time???
+import neopixel
 
-class Data:
-    def __init__(self, rtc: object, tc: object) -> None:
-        self.rtc = rtc
-        self.tc = tc
-        self.air = 0
-        self.oven = 0
-        return
-    def update(self) -> None:
-        self.air = self.rtc.temperature
-        self.oven = self.tc.read()
-        return
-    
-class Status:
+class Relay:
+    '''Simple class to control a relay connected to a pin on the board.'''
+    def __init__(self, pin):
+        '''
+        Initialize the relay with the pin number.'''
+        self.relay = digitalio.DigitalInOut(pin)
+        self.relay.direction = digitalio.Direction.OUTPUT
+
+    def on(self):
+        '''Turn the relay on.'''
+        self.relay.value = True
+
+    def off(self):
+        '''Turn the relay off.'''
+        self.relay.value = False
+
+class LEDs:
+    '''Class to control a neopixel strip connected to a pin on the board.'''
+    def __init__(self, pin):
+        '''Initialize the neopixel strip with the pin number.'''
+        self.led = neopixel.NeoPixel(pin, 4)
+
+    def off(self):
+        '''Turn off all the LEDs.'''
+        self.led.fill((0, 0, 0))
+
+    def solid(self, color: tuple):
+        '''Set all the LEDs to a single color.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)'''
+        self.led.fill(color)
+
+    def blink(self, color: tuple, rate: float = 0.2, blinks: int = 5):
+        '''Blink the LEDs a set number of times.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)
+            rate (float): Time between blinks in seconds
+            blinks (int): Number of blinks'''
+        for i in range(blinks):
+            self.led.fill(color)
+            time.sleep(rate)
+            self.led.fill((0, 0, 0))
+            time.sleep(rate)
+
+    def fade(self, color: tuple, rate: float = 1, blinks: int = 5):
+        '''Fade the LEDs in and out.
+        Parameters:
+            color (tuple): RGB color tuple (0-255)
+            rate(float): Time between peaks in seconds
+            blinks (int): Number of blinks'''
+        step_time = rate / (2 * 255 / 5)  # Calculate the time for each step
+        for _ in range(blinks):
+            for i in range(0, 255, 5):
+                r = int(color[0] * i / 255)
+                g = int(color[1] * i / 255)
+                b = int(color[2] * i / 255)
+                self.led.fill((r, g, b))
+                time.sleep(step_time)
+            for i in range(255, 0, -5):
+                r = int(color[0] * i / 255)
+                g = int(color[1] * i / 255)
+                b = int(color[2] * i / 255)
+                self.led.fill((r, g, b))
+                time.sleep(step_time)
+
+class ASOCS:
+    '''Main class for the ASOCS device. This class will control the hardware components
+    and manage the temperature control.'''
     def __init__(self):
-        self.controlling = False
-        self.relay_state = False
-        self.enabled = False
-        return
-    
-class Time:
-    def __init__(self, rtc: object) -> None:
-        self.datetime = rtc.datetime
-        self.timemin = int(self.datetime.tm_hour*60 + self.datetime.tm_min)
-        return
-    def update(self, rtc: object) -> None:
-        self.datetime = rtc.datetime
-        self.timemin = int(self.datetime.tm_hour*60 + self.datetime.tm_min)
-        return
+        '''Initialize the ASOCS class and initialize the hardware components.'''
+        rtc_i2c = busio.I2C(sda=board.GP0, scl=board.GP1)
+        self.rtc = adafruit_ds3231.DS3231(rtc_i2c)
+        self.tc = MAX6675(board.GP18, board.GP19, board.GP16)
+        self.relay = Relay(board.GP2)
+        self.led = LEDs(board.GP28)
 
+        self.current_time = None
+        self.next_update = None
 
+        self.control_temp = None
+        self.start_time = None
+        self.end_time = None
 
-def set_time(rtc, oled):
-    try:
-        display_text(oled, 'Time reset\ndetected...')
-        display_text(oled, 'See terminal\nfor instructions')
-        print('Time reset detected, please set the time:')
-        year = int(input('Enter the year: '))
-        month = int(input('Enter the month: '))
-        day = int(input('Enter the day: '))
-        hour = int(input('Enter the hour: '))
-        minute = int(input('Enter the minute: '))
-        t = time.struct_time((year, month, day, hour, minute, 0, 0, 0, 0))
-        print(f'Setting time to {t}')
-        rtc.datetime = t #set the time
-        print('Time set successfully')
-        print("Disconnect the USB from the PC and connect to the power supply")
-    except ValueError:
-        print('Invalid input, please try again')
-        set_time(rtc, oled)
-    return
+        self.air_temp = 0
+        self.oven_temp = 0
 
-def update_oled(oled, data, time, controlling, relay_state, enabled):
-    #TODO make all display functions and hw init functions into a class in submodule
-    def add_leading_zeros(num):
-        return "{:02d}".format(num)
-    oled.fill(0)
-    hour = add_leading_zeros(time.tm_hour)
-    minute = add_leading_zeros(time.tm_min)
-    oled.text(f'Time: {hour}:{minute}', 0, 0, 1)
-    oled.text(f'Air Temp: {data["air"]} C', 0, 10, 1)
-    oled.text(f'Oven Temp: {data["oven"]} C', 0, 20, 1)
-    if enabled:
-        oled.text(f'Control: Enabled', 0, 30, 1)
-    else:
-        oled.text(f'Control: Disabled', 0, 30, 1)
-    if relay_state and controlling:
-        oled.text(f'Status: Heating', 0, 40, 1)
-    else:
-        oled.text(f'Status: Idle', 0, 40, 1)
-    oled.text(f'Toggle control -->', 0, 50, 1)
-    oled.show()
-    return
+    def update_data(self):
+        '''Update the current air and oven temperatures. Set the time for the next sensor update'''
+        self.air_temp = self.rtc.temperature
+        self.oven_temp = self.tc.read()
+        self.next_update = self.current_time + timedelta(seconds=30)
 
-def reset_oled(oled): #clears the oled display
-    oled.fill(0)
-    oled.show()
-    return
+    def load_settings(self):
+        '''Load the settings from the SETTINGS.json file. If the file does not exist or an 
+        error occurs, default settings will be used. Blinks green if successful, red if failed.'''
+        try:
+            with open('SETTINGS.json', 'r') as f:
+                settings = json.load(f)
+            self.control_temp = settings['temperature(C)']
+            self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['start_hour'], settings['start_minute'])
+            self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['end_hour'], settings['end_minute'])
+            if settings['reset_time_hour'] != 0 and settings['reset_time_minute'] != 0:
+                self.update_time(settings['reset_time_hour'], settings['reset_time_minute'])
+                settings['reset_time_hour'] = 0
+                settings['reset_time_minute'] = 0
+                storage.remount("/", False)
+                with open('SETTINGS.json', 'w') as f:
+                    json.dump(settings, f)
+            elif self.rtc.lost_power:
+                print('RTC lost power, time is not accurate')
+                self.led.fade(color=(255, 0, 0), rate=1, blinks=5)
+            print('Settings loaded')
+            # blink the LEDs green to indicate successful settings load
+            self.led.blink(color=(0, 255, 0), rate=0.4, blinks=2)
+            
+        
+        except Exception as e:
+            print('Failed to load settings, using defaults')
+            print(e)
+            self.control_temp = 60
+            self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 8, 0)
+            self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
+            self.led.blink(color=(255, 150, 0), rate=0.4)
 
-def fill_oled_random(oled, duration=1):
-    for x in range(oled.width):
-        for y in range(oled.height):
-            oled.pixel(x, y, random.randint(0, 1))
-    oled.show()
-    time.sleep(duration)
-    return
+    def update_time(self, hour, minute):
+        '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.
+        Parameters:
+            hour (int): Hour to set the RTC to
+            minute (int): Minute to set the RTC to'''
+        self.rtc.datetime = time.struct_time((self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, hour, minute, 0, 0, 0, -1))
+        self.current_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec)
+        # blink the LEDs blue to indicate success
+        self.led.blink(color=(0, 0, 255), rate=0.4)
 
-def display_text(oled, text, duration=2):
-    text = text.split('\n')
-    reset_oled(oled)
-    for i in range(len(text)):
-        oled.text(text[i], 0, i*10, 1)
-    oled.show()
-    time.sleep(duration)
-    reset_oled(oled)
-    return
-
-def init_hw():
-    #Hardware Startup Sequence
-    rtc_i2c = busio.I2C(sda=board.GP16, scl=board.GP17)#create an i2c object on pins 21(SDA) and 22(SCL)
-    oled_i2c = busio.I2C(scl=board.GP7, sda=board.GP6)#create an i2c object on pins 9(SDA) and 10(SCL)
-    oled = adafruit_ssd1306.SSD1306_I2C(128, 64, oled_i2c)#initialize the lcd
-    fill_oled_random(oled, 3)
-    reset_oled(oled)
-    print('Display initialized')
-    display_text(oled, 'Initializing\nSystem...')
-    rtc = adafruit_ds3231.DS3231(rtc_i2c)#initialize the ds3231
-    #set_time()#set the time if it has defaulted
-    print('RTC initialized')
-    tc = MAX6675(board.GP2, board.GP3, board.GP4)
-    print('Thermocouple initialized')
-    relay = digitalio.DigitalInOut(board.GP28) #assign gpio pin 28 to the relay
-    relay.direction = digitalio.Direction.OUTPUT
-    print('Relay initialized')
-    encoder = rotaryio.IncrementalEncoder(board.GP10, board.GP11)
-    button = digitalio.DigitalInOut(board.GP13)
-    button.direction = digitalio.Direction.INPUT
-    button.pull = digitalio.Pull.UP
-    print('Rotary encoder initialized')
-    print('System Initialized')
-    display_text(oled, 'System\nInitialized')
-    reset_oled(oled)
-    #End Hardware Startup Sequence
-    return rtc, oled, tc, relay, encoder, button
-
-def load_settings(oled):
-    try:
-        with open('settings.json', 'r') as f:
-            settings = json.load(f)
-        print('Settings loaded successfully')
-        display_text(oled, 'Settings\nLoaded')
-        return settings
-    except Exception as e:
-        print(e)
-        settings = {
-            'control_temp': 50, 
-            'start_time': 660, 
-            'end_time': 1020, 
-            'kP': 1,
-            'kI': 0.1,
-            'kD': 0.1,
-            'reset_time': False}
-        make_filesystem_writable()
-        with open('settings.json', 'w') as f:
-            json.dump(settings, f)
-        print('Settings not found, using defaults')
-        display_text(oled, 'Settings\nNot Found\nUsing Defaults')
-        return settings
-
-def save_settings(settings):
-    make_filesystem_writable()
-    try:
-        with open('settings.json', 'w') as f:
-            json.dump(settings, f)
-    except Exception as e:
-        print(e)
-        print('Error saving settings')
-    try:
-        with open('settings.json', 'r') as f:
-            assert json.load(f) == settings 
-        return True
-    except Exception as e:
-        print(f'Settings did not match: {e}')
-    return False
-
-def make_filesystem_writable():
-    try:
-        if storage.getmount("/").readonly:
-            # Remount the filesystem as read-write
-            storage.remount("/", readonly=False)
-            print("Filesystem remounted as writable")
-    except Exception as e:
-        print(e)
-        print("Failed to remount filesystem as writable")
-
-def init_pid(settings):
-    pid = PID(settings['kP'], settings['kI'], settings['kD'], setpoint=settings['control_temp'])
-    pid.auto_mode = True
-    pid.output_limits = (0, 10)
-    return pid
-
-def main(): 
-    data = {'air': 15, 'oven': 15} #the measurement data. May add other measurements later
-    rtc, oled, tc, relay, encoder, button = init_hw() #initialize the hardware components
-    if rtc.datetime.tm_year <= 2000: #users sets the time if there isn't one
-        print(rtc.datetime)
-        set_time(rtc, oled) #set the time if it has defaulted
-    pid_time = 0 #How long the element should be turned on for in minutes
-    controlling = False #whether or not the oven needs to be controlled
-    settings = load_settings(oled) #load the settings from the settings.json file or use defaults if unsuccessful
-    # if settings['reset_time'] == True:
-    #     set_time(rtc, oled)
-    #     settings['reset_time'] = False
-    #     save_settings(settings)
-    pid = init_pid(settings) #Creates the pid class
-    time_min = 0
-    enabled = False
-    data['air'] = rtc.temperature #obtain the "air" temp from the rtc
-    data['oven'] = tc.read() #obtain the oven temp from the thermocouple
-    datetime = rtc.datetime
-    update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
+def main():
+    '''
+    Main loop for the ASOCS device. This loop will update the current time
+    and check if the oven needs to be turned on or off based on the control
+    temperature and the time window for the oven to be on.
+    '''
+    asocs = ASOCS()
+    asocs.led.off()
+    asocs.load_settings()
     print('Startup complete, entering main loop...')
+    asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
+    asocs.update_data()
     while True:
-        prev_time = time_min
-        datetime = rtc.datetime
-        time_min = int(datetime.tm_hour*60 + datetime.tm_min) #convert the time to minutes
-        if time_min >= prev_time + 1:
-            data['air'] = rtc.temperature #obtain the "air" temp from the rtc
-            data['oven'] = tc.read() #obtain the oven temp from the thermocouple
-            print(f'Time:{datetime.tm_hour}:{datetime.tm_min} Air: {data["air"]} C Oven: {data["oven"]} C')
-            update_oled(oled, data, datetime, controlling, relay.value, enabled) #update the oled display
-        if enabled:
-            if controlling:
-                if time_min > settings['end_time']:
-                    controlling = False
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('End time exceeded, turning oven PID control off')
-                if data['oven'] < settings['control_temp'] and relay.value == False:
-                    pid_time = time_min + pid(data['oven']) #set the ending time for the element
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('Turning on oven element')
-                if time_min < pid_time:
-                    if relay.value == False:
-                        relay.value = True #turn the element on if the pid duration hasn't finished
-                        update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                else:
-                    if relay.value == True:
-                        relay.value = False #turn the element off
-                        update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('Turning off oven element')
-                # update_oled(oled, data, datetime, controlling, relay.value, enabled)
+        #update the current time
+        asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
+
+        #check if we need to update the data, updating if needed
+        if asocs.current_time > asocs.next_update:
+            asocs.update_data()
+            print(f'[{asocs.current_time}]: Air: {asocs.air_temp}°C Oven: {asocs.oven_temp}°C')
+        #check we are within the time window for oven control
+        if asocs.current_time > asocs.start_time and asocs.current_time < asocs.end_time:
+
+            #turn on the heating element if the oven temp is less than the control temp, otherwise keep it off
+            if asocs.oven_temp < asocs.control_temp:
+                asocs.relay.on()
+                # set the LEDs to green if the relay is on
+                asocs.led.solid((0, 255, 0))
             else:
-                relay.value = False
-                if data['oven'] < settings['control_temp'] and time_min > settings['start_time'] and time_min < settings['end_time']:
-                    controlling = True
-                    update_oled(oled, data, datetime, controlling, relay.value, enabled)
-                    print('Conditions not met, turning oven PID control on')
-        if button.value == False:  
-            if enabled:
-                display_text(oled, 'Oven Control:\nDisabled')
-                print('Oven control disabled')
-                relay.value = False
-                enabled = False
-            else:
-                display_text(oled, 'Oven Control:\nEnabled')
-                print('Oven control enabled')
-                enabled = True
-            update_oled(oled, data, datetime, controlling, relay.value, enabled)
+                asocs.relay.off()
+                asocs.led.off()
         time.sleep(0.01)
-    
+
+def standby():
+    '''
+    Standby mode is entered when the USB is connected to the device.
+    This mode will wait for the user to press a key to enter debug mode or
+    will enter standby mode during settings configuration.
+    '''
+    asocs = ASOCS()
+    while True:
+        print("Currently in standby mode...")
+        # blink the LEDs purple to indicate standby mode
+        asocs.led.fade(color=(54, 1, 63), rate=1, blinks=5)
+
 if __name__ == '__main__':
-    main()
+    if supervisor.runtime.usb_connected:
+        #enter standby mode if usb is connected
+        standby()
+    else:
+        #enter normal operation if usb is not connected
+        main()

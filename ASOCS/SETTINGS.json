@@ -1,0 +1,9 @@
+{
+    "temperature(C)": 60,
+    "start_hour": 11,
+    "start_minute": 15,
+    "end_hour": 17,
+    "end_minute": 30,
+    "reset_time_hour": 0,
+    "reset_time_minute": 0
+}
