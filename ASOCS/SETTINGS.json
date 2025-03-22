@@ -1,5 +1,5 @@
 {
-    "temperature(C)": 60,
+    "temperature": 60,
     "start_hour": 11,
     "start_minute": 15,
     "end_hour": 17,

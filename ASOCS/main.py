@@ -108,7 +108,7 @@ class ASOCS:
         try:
             with open('SETTINGS.json', 'r') as f:
                 settings = json.load(f)
-            self.control_temp = settings['temperature(C)']
+            self.control_temp = settings['temperature']
             self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['start_hour'], settings['start_minute'])
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['end_hour'], settings['end_minute'])
             if settings['reset_time_hour'] != 0 and settings['reset_time_minute'] != 0:
