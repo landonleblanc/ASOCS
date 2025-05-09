@@ -1,7 +1,7 @@
 {
-    "temperature": 60,
+    "temperature": 50,
     "start_hour": 11,
-    "start_minute": 15,
+    "start_minute": 0,
     "end_hour": 17,
     "end_minute": 30,
     "reset_time_hour": 0,

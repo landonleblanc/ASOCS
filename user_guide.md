@@ -12,7 +12,7 @@ Just plug it in and it will control the oven temperature during the control wind
 - Off: The heating element is off.
 - Solid Orange: The heating element is on.
 - Blinking Red: An error has occured, most likely the system time was reset. Follow "Setting the time" below. If this issue persists, try replacing the battery.
-- 5 Green blinks: The user defined settings were sucessfully loaded.
+- 2 Green blinks: The user defined settings were sucessfully loaded.
 - 5 Red blinks: The user defined settings failed to load and the system will continue with the default settings. If this occurs, ensure SETTINGS.json is formatted correctly and the values are integers.
 - Fading Purple: The device is connected to a computer and the system is idle.
 ## Device Settings
@@ -37,4 +37,4 @@ The following parameters can be changed to customize the behavior of the control
 3. Change the value of "reset_time_minute" to the current minute
 4. Disconnect the USB A cable from the computer
 5. Connect the USB A cable to the power adapter
-6. Upon startup the LEDs should blink green 5 times indicated the time was successfully set
+6. Upon startup the LEDs should blink blue 5 times indicated the time was successfully set

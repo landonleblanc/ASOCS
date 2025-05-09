@@ -117,7 +117,7 @@ class ASOCS:
                 settings['reset_time_minute'] = 0
                 storage.remount("/", False)
                 with open('SETTINGS.json', 'w') as f:
-                    json.dump(settings, f)
+                    json.dump(settings, f, indent=4)
             elif self.rtc.lost_power:
                 print('RTC lost power, time is not accurate')
                 self.led.fade(color=(255, 0, 0), rate=1, blinks=5)
@@ -132,7 +132,7 @@ class ASOCS:
             self.control_temp = 60
             self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 8, 0)
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
-            self.led.blink(color=(255, 150, 0), rate=0.4)
+            self.led.blink(color=(255, 0, 0), rate=0.4)
 
     def update_time(self, hour, minute):
         '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.
@@ -170,8 +170,8 @@ def main():
             #turn on the heating element if the oven temp is less than the control temp, otherwise keep it off
             if asocs.oven_temp < asocs.control_temp:
                 asocs.relay.on()
-                # set the LEDs to green if the relay is on
-                asocs.led.solid((0, 255, 0))
+                # set the LEDs to orange if the relay is on
+                asocs.led.solid((255, 165, 0))
             else:
                 asocs.relay.off()
                 asocs.led.off()
@@ -187,7 +187,7 @@ def standby():
     while True:
         print("Currently in standby mode...")
         # blink the LEDs purple to indicate standby mode
-        asocs.led.fade(color=(54, 1, 63), rate=1, blinks=5)
+        asocs.led.fade(color=(54, 1, 63), rate=3, blinks=5)
 
 if __name__ == '__main__':
     if supervisor.runtime.usb_connected:
