@@ -1,5 +1,6 @@
 # ASOCS User Guide
 ## First Time Setup
+![Wiring output photo](images/outputs.png)
 1. Connect the thermocouple to the correct positions on the thermocouple termina
 2. Connect the relay wires to the correct positions on the relay terminal
 3. Connect the fan wires to the correct positions on the relay terminal
