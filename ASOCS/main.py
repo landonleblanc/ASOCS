@@ -1,14 +1,18 @@
 import time
-import json
+import os
+import storage
 from adafruit_datetime import datetime, timedelta
 import board
 import busio
 import digitalio
 import supervisor
 import adafruit_ds3231
-import storage
 from max6675 import MAX6675
 import neopixel
+import SETTINGS
+
+VERSION = '0.2.1'  # Version of the ASOCS firmware
+print(f'\nASOCS Firmware Version: {VERSION}')
 
 class Relay:
     '''Simple class to control a relay connected to a pin on the board.'''
@@ -103,47 +107,54 @@ class ASOCS:
         self.next_update = self.current_time + timedelta(seconds=30)
 
     def load_settings(self):
-        '''Load the settings from the SETTINGS.json file. If the file does not exist or an 
-        error occurs, default settings will be used. Blinks green if successful, red if failed.'''
+        '''Load the settings from the SETTINGS.py file. If an error occurs, default settings will be used. 
+        Blinks green if successful, red if failed.'''
         try:
-            with open('SETTINGS.json', 'r') as f:
-                settings = json.load(f)
-            self.control_temp = settings['temperature']
-            self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['start_hour'], settings['start_minute'])
-            self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, settings['end_hour'], settings['end_minute'])
-            if settings['reset_time_hour'] != 0 and settings['reset_time_minute'] != 0:
-                self.update_time(settings['reset_time_hour'], settings['reset_time_minute'])
-                settings['reset_time_hour'] = 0
-                settings['reset_time_minute'] = 0
-                storage.remount("/", False)
-                with open('SETTINGS.json', 'w') as f:
-                    json.dump(settings, f, indent=4)
-            elif self.rtc.lost_power:
-                print('RTC lost power, time is not accurate')
-                self.led.fade(color=(255, 0, 0), rate=1, blinks=5)
+            self.control_temp = SETTINGS.TEMPERATURE
+            self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, SETTINGS.START_TIME[0], SETTINGS.START_TIME[1])
+            self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, SETTINGS.END_TIME[0], SETTINGS.END_TIME[1])
             print('Settings loaded')
             # blink the LEDs green to indicate successful settings load
             self.led.blink(color=(0, 255, 0), rate=0.4, blinks=2)
             
-        
         except Exception as e:
             print('Failed to load settings, using defaults')
             print(e)
             self.control_temp = 60
             self.start_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 8, 0)
             self.end_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, 18, 0)
-            self.led.blink(color=(255, 0, 0), rate=0.4)
+            self.led.blink(color=(255, 0, 0), rate=0.4, blinks=5)
 
-    def update_time(self, hour, minute):
-        '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.
-        Parameters:
-            hour (int): Hour to set the RTC to
-            minute (int): Minute to set the RTC to'''
-        self.rtc.datetime = time.struct_time((self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, hour, minute, 0, 0, 0, -1))
-        self.current_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec)
-        # blink the LEDs blue to indicate success
-        self.led.blink(color=(0, 0, 255), rate=0.4)
-
+    def check_time(self):
+        '''Update the time on the RTC to the specified hour and minute. Blinks blue if successful.'''
+        
+        if "time.txt" in os.listdir():
+            print("Found time.txt, setting RTC time from file")
+            with open('time.txt', 'r') as f:
+                time_data = f.read().strip().split(':')
+                hour = int(time_data[0])
+                minute = int(time_data[1])
+                self.rtc.datetime = time.struct_time((self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, hour, minute, 0, 0, 0, -1))
+                self.current_time = datetime(self.rtc.datetime.tm_year, self.rtc.datetime.tm_mon, self.rtc.datetime.tm_mday, self.rtc.datetime.tm_hour, self.rtc.datetime.tm_min, self.rtc.datetime.tm_sec)
+        
+            try:
+                # Ensure filesystem is writable before removing file
+                try:
+                    storage.remount("/", readonly=False)
+                except:
+                    print("Failed to remount filesystem as writable")
+                    pass  # Already writable or remount not needed
+                os.remove("time.txt")
+            except Exception as e:
+                print(f"Error removing time.txt: {e}")
+                self.led.blink(color=(255, 255, 255), rate=0.4, blinks=5)
+            self.led.blink(color=(0, 0, 255), rate=0.4)
+            return
+        if self.rtc.lost_power:
+            print("RTC lost power, time is not accurate")
+            while True:
+                self.led.blink(color=(255, 0, 0), rate=0.4, blinks=5)
+        
 def main():
     '''
     Main loop for the ASOCS device. This loop will update the current time
@@ -152,6 +163,7 @@ def main():
     '''
     asocs = ASOCS()
     asocs.led.off()
+    asocs.check_time()  # Ensure the RTC is set to the correct time
     asocs.load_settings()
     print('Startup complete, entering main loop...')
     asocs.current_time = datetime(asocs.rtc.datetime.tm_year, asocs.rtc.datetime.tm_mon, asocs.rtc.datetime.tm_mday, asocs.rtc.datetime.tm_hour, asocs.rtc.datetime.tm_min, asocs.rtc.datetime.tm_sec)
@@ -193,6 +205,7 @@ if __name__ == '__main__':
     if supervisor.runtime.usb_connected:
         #enter standby mode if usb is connected
         standby()
+        # main()  # For testing purposes, run main directly
     else:
         #enter normal operation if usb is not connected
         main()
